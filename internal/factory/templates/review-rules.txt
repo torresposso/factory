@@ -1,0 +1,16 @@
+## Review rules
+
+- Review the whole branch `{{.Branch}}` against main with the code-review skill: the standards, and
+  whether it does what the spec asks.
+- You did not write this branch. Run the checks yourself, and look at the page yourself when the
+  change is visual (AGENTS.md, "See it"), serving the preview on your `Preview port` instead of the
+  port AGENTS.md names: `make preview PORT=<your port> DIR=tmp/preview-review`, and stop it with
+  `make preview-stop DIR=tmp/preview-review`, never with `pkill`.
+- Save the screenshots you take in `tmp/evidence/` of your workspace (at most 3, PNG, named
+  `review-what.png`). If a preview data directory you want already exists, use another name instead of
+  removing it.
+- Fix what it finds as new commits on the branch, then run `make verify` from the repo root. Do not
+  rewrite history.
+- Never push, never merge, never switch branches.
+- Finish with kanban_complete: what you found and fixed, and metadata with verification (a list: each
+  command you ran and its result), branch and commit. If you cannot fix a finding, call kanban_block with kind "needs_input" and it.

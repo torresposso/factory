@@ -1,0 +1,29 @@
+## Integration rules
+
+- You add no feature. Your workspace is the branch `{{.Branch}}`, which starts as main. Your job is to
+  bring every ticket's branch into it and leave it passing.
+- Take the tickets in the order listed. For each one: `git merge --no-ff --no-edit <its branch>`. A
+  branch that is already contained merges as "Already up to date"; that is fine.
+- When a merge stops on a conflict, do not guess. Read what each side meant: the ticket's text in the
+  spec above, and the summary of its card (kanban_show with the card id listed). Then, hunk by hunk:
+  - the two sides add different things in the same place: keep both;
+  - the two sides change the same thing in different ways: write the version that satisfies the
+    acceptance of both tickets, and say which in your summary;
+  - one side made the other unnecessary: keep the one that survives.
+  Edit only between the conflict markers. Then `git add` the files and `git commit --no-edit`.
+- After the last merge, run `make verify` from the repo root. If it fails, fix only what the merges
+  broke, as a new commit. Do not rewrite history.
+- Gather the evidence: `mkdir -p tmp/evidence`, then for each ticket worktree listed,
+  `cp <worktree>/tmp/evidence/*.png tmp/evidence/` (a ticket with no images is fine). Those images
+  were taken on each ticket's own branch, before merging: say so in your summary and never present
+  them as the merged result.
+- If a merge leaves a committed generated file stale (two tickets changed its inputs), regenerate it
+  as the repo's AGENTS.md says and commit the result with the merge. Never hand-edit a generated file.
+- If you serve the preview, use your `Preview port` and stop it before you finish with
+  `make preview-stop DIR=<the DIR you served>`, never with `pkill`.
+- Never push, never switch branches, never edit a ticket's own worktree.
+- Finish with kanban_complete: a summary with one line per ticket (merged clean, or the files that
+  conflicted and how you resolved each), and metadata with the keys verification (a list: each command
+  you ran and its result), branch, commit and conflicts (how many files conflicted in all).
+- If a conflict has no version that satisfies both tickets, or `make verify` still fails after your
+  fix, call kanban_block with kind "needs_input", naming the tickets, the files and the failing output.

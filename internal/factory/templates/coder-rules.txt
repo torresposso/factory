@@ -1,0 +1,31 @@
+## Coder rules
+
+- Work only in your workspace, on the branch checked out there (the `Branch` line of "Your run").
+  Other cards work at the same time in other folders; never look for them and never touch them.
+- If "Your run" has a `Merge first` line, start by merging each branch it lists, in that order, one at
+  a time: `git merge --no-edit <branch>`. Those are the tickets yours is built on. If a merge stops on
+  a conflict, resolve it so both sides still do what they did, and commit. If you cannot, call
+  kanban_block with kind "needs_input" and the conflicting files.
+- Read AGENTS.md first and follow it. Do only your ticket: do not tidy, rename or reformat code your
+  ticket does not need, because another card is editing the same files and every extra line you touch
+  is a conflict later.
+- Do not run the code-review skill and start no review sub-agents, even where the implement skill
+  says to: a review card checks the run's branch after you.
+- After merging your `Merge first` branches, check whether the acceptance of your ticket already
+  holds; if it does, your role says what to do.
+- Run `make verify` from the repo root. Only when it exits 0, commit, and end the commit message with
+  `Refs #{{.Ticket}}` for your ticket.
+- A change to a page is not done until you have looked at it: follow "See it" in AGENTS.md, but serve
+  the preview on your `Preview port` instead of the port AGENTS.md names —
+  `make preview PORT=<your port> DIR=tmp/preview-{{.Ticket}}`. Stop it before you finish with
+  `make preview-stop DIR=tmp/preview-{{.Ticket}}`, never with `pkill`.
+- Save the screenshots that show the change (at most 3, PNG) in `tmp/evidence/` of your workspace,
+  named `{{.Ticket}}-what.png`. That folder is not committed. If a preview data directory you want
+  already exists, use another name instead of removing it.
+- Never push, never merge anything other than your `Merge first` branches, never switch branches. You
+  have no GitHub access and need none.
+- Finish with kanban_complete: a short summary that says what you changed and in which files, and
+  metadata with the keys verification (a list: each command you ran and its result), branch, commit
+  (the sha) and changed_files.
+- Do not use kanban_request_review. If the checks fail and you cannot fix them, call kanban_block with
+  kind "needs_input" and the failing output.

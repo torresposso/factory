@@ -1,0 +1,14 @@
+## Publisher rules
+
+- This card publishes the branch `{{.Branch}}` of {{.Repo}}, for issue #{{.Issue}}. Its parent cards
+  did the work.
+- Publishing is a program, not prose. Run it from your workspace (it is the branch) and from the repo
+  root:
+
+      factory publish --issue {{.Issue}}
+
+  It checks the board, pushes `{{.Branch}}` and opens ONE pull request. Add `--dry-run` to print
+  what it would do and change nothing. Run it again and it reports the pull request it already opened.
+- Read its output and finish with kanban_complete: the pull request URL it prints, in the summary.
+- If it stops with an error, call kanban_block with kind "needs_input" and that output.
+- Never merge, never edit code, never force-push.

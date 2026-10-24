@@ -1,0 +1,37 @@
+# A tag vX.Y.Z publishes the release: one static binary per architecture and SHA256SUMS, which is
+# what an image pins (amd64 on a PC, arm64 on an ARM server).
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: make verify
+      - name: Build
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath \
+              -ldflags "-s -w -X main.version=$VERSION" \
+              -o "dist/factory-linux-$arch" ./cmd/factory
+          done
+          cd dist && sha256sum factory-linux-* > SHA256SUMS && cat SHA256SUMS
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.ref_name }}
+        run: gh release create "$VERSION" dist/factory-linux-amd64 dist/factory-linux-arm64 dist/SHA256SUMS --title "$VERSION" --generate-notes --verify-tag
