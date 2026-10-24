@@ -1,6 +1,7 @@
 # Hermes facts the program depends on
 
-Checked on Hermes 0.21.6 (2026-10-15) in `hermes kanban ... --help` and in Hermes's own source.
+Checked on Hermes 0.22.5 (2026-10-24) in `hermes kanban ... --help`, in Hermes's own source (tag `v0.22.5`)
+and, where it says so, on Basecamp.
 
 ## The board
 
@@ -8,20 +9,25 @@ Checked on Hermes 0.21.6 (2026-10-15) in `hermes kanban ... --help` and in Herme
   `boards switch`. `boards list --json` lists every board with its `slug`, and `list --json` includes
   each card's `body`.
 - `create --json` prints the whole card; its id is `id`. `list --json` has no `parents` and no
-  `idempotency_key` (only `show --json` has `parents`), so a Run's cards are found by `workspace_path`
+  `idempotency_key`; `show --json` has `parents` but no key either, so a Run's cards are found by `workspace_path`
   and recognized by the titles the program wrote.
 - Parents must exist before their children are created. A child starts in `todo` until every parent is
   `done` or `archived`: archiving a parent releases its children, so unfinished cards are archived
-  together.
+  together. A card created under an archived parent is born `todo` and turns `ready` on the next
+  dispatcher tick or `list`.
 - An idempotency key returns the existing card when it is not archived and makes a new one when it is:
   to repeat a Run, archive first — which is what `plan` does to the leftovers of an earlier Run of the
   same issue.
-- `--completion-contract OWNER/REPO` fails when the repository has no required status checks. The cards
-  use `local-only`, and `publish` checks the pull request itself.
-- Hermes fires `kanban_task_completed` only to a Python plugin, never to a shell command, so nothing
-  waits on a hook; the program reads the board.
+- `--completion-contract OWNER/REPO` fails, at completion and not at creation, when the repository has
+  no required status checks. The cards use `local-only`, and `publish` checks the pull request itself.
+- `kanban_task_completed` reaches a shell hook (`hooks:` in a profile's `config.yaml`). Tried on Basecamp
+  on 2026-10-24: the hook in the assignee's profile ran in the worker without an allowlist entry, with
+  the card's workspace as `cwd`, and got `extra.task_id`, `board`, `assignee`, `run_id` and `summary` on
+  stdin, but not the run's metadata. It only fires for the profile whose config has it. On 0.21.6 the
+  worker registered no shell hooks, which is why the program reads the board instead.
 - A worker reports `verification`, `branch`, `commit` and `changed_files` in its metadata, and
-  `hermes kanban runs <id> --json` is where the Evidence reads the first three from. Workers write
+  `hermes kanban runs <id> --json` is where the Evidence reads the first three from (`show --json` also
+  carries them under `runs`). Workers write
   `verification` as text, as a list or as an object of check and result, and leave it out now and then;
   the Evidence lists each check in any of those shapes.
 
