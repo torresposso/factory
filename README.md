@@ -81,8 +81,8 @@ has a review card, because a coder reviewing its own work is no review.
 
 The preview ports are the machine's, not one board's: `plan` reads the `Preview port:` lines of every
 card that is not done on every board and gives each ticket, then the run, the first port from 8100
-whose `PORT+1000` is free too. 8191, 9191 (a preview served by hand), 8642, 8644 (the Hermes API and
-webhooks) and 9119 (its dashboard) are never handed out. Integrate and review share the run's port.
+whose `PORT+1000` is free too. 8191, 9191 (a preview served by hand), 8642 (the Hermes API) and 9119
+(its dashboard) are never handed out. Integrate and review share the run's port.
 
 The publisher card is one command, `factory publish --issue <N>`, so it never becomes a second
 implementation of publishing; `factory` must be on the workers' `PATH`.

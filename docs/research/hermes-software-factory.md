@@ -28,7 +28,9 @@ de código, al repo de Hermes. Lo que no se probó corriendo algo está marcado 
    siguen con el prompt viejo de unas 140 líneas, en el que el perfil `orchestrator` corre git, gh y kanban él
    mismo. `factory plan` solo se ha corrido a mano, en el tablero `laiacaliente-app`. Eso deja dos fuentes
    de verdad, que ya se separaron: la ruta en prosa no crea tarjeta de Review cuando el ticket va solo, y su
-   publisher escribe él mismo el cuerpo del PR.
+   publisher escribe él mismo el cuerpo del PR. **Resuelto el 2026-10-24 quitando el webhook:** las dos
+   rutas, el Funnel `/webhooks`, el puerto `8644` y el hook de GitHub ya no existen. Quien publica el spec
+   le da la orden a Hermes (`factory plan --issue N` desde el repo, por chat o por `hermes peer run`).
 4. **Hay una afirmación de `docs/hermes.md` que el código contradice.** El archivo dice que
    `kanban_task_completed` solo le llega a un plugin de Python. Pero ese evento está en `VALID_HOOKS`
    (`hermes_cli/plugins.py:161`), que es la lista de eventos permitidos para shell hooks
@@ -47,11 +49,10 @@ de código, al repo de Hermes. Lo que no se probó corriendo algo está marcado 
 ## 2. Cómo encajan las piezas de Hermes
 
 ```
-GitHub issue (label run-factory)
-      │  webhook HMAC (:8644, Funnel /webhooks)
+spec + tickets publicados en GitHub
+      │  él le da la orden a Hermes (chat o hermes peer run basecamp)
       ▼
-ruta webhook ──cron_job──▶ job de cron con --workdir <repo>   (carga AGENTS.md del repo)
-                                │  corre: factory plan --issue N
+                     cd <repo> && factory plan --issue N
                                 ▼
                     kanban (un tablero por repo)
    coder ×T ──▶ Integrate ──▶ Review (qa) ──▶ Publish (publisher: factory publish)
@@ -205,7 +206,6 @@ y no hay ningún job de cron. Los tableros: `factory-sandbox` (43 tarjetas hecha
 
 | Qué roza | Efecto |
 |---|---|
-| El webhook usa la prosa y no `factory plan` | Dos fuentes de verdad, que ya se separaron |
 | `~/AGENTS.md` dice planner/coder/tester/reviewer y que laiacaliente no está clonado | Los perfiles son orchestrator/coder/qa/publisher y el repo **sí** está clonado |
 | El `SOUL.md` de `publisher` le dice que escriba «Merge danger» | Eso ya lo arma `factory publish` en código |
 | La skill `implement` dice «usa /code-review» | La regla de la tarjeta lo prohíbe; hoy gana la regla solo porque viene en la tarjeta |
@@ -223,9 +223,9 @@ y no hay ningún job de cron. Los tableros: `factory-sandbox` (43 tarjetas hecha
 2. **Probar el hook `kanban_task_completed`** en `factory-sandbox`. Si funciona, la tarjeta Publish puede
    cambiarse por un hook que corra `factory publish`. Eso quita el paso que hoy depende de un modelo. Antes
    hay que corregir `docs/hermes.md`.
-3. **Pasar el webhook a `factory plan`**: una ruta `cron_job:` que dispare un job con `--workdir <repo>`
-   cuyo único trabajo sea correr el programa, y borrar la prosa de las rutas. Así queda una sola fuente de
-   verdad.
+3. ~~**Pasar el webhook a `factory plan`**~~. Hecho de otra forma el 2026-10-24: se quitó el webhook. La
+   orden de arrancar la da él, que es quien publica el spec, así que `factory plan` es la única fuente de
+   verdad y Basecamp ya no expone nada a internet.
 4. **Poner a punto las tarjetas**: `--max-retries 1` en Publish, leer `runs[]` desde `show --json` y
    agregar `diagnostics --json` a la salida.
 5. **Limpiar lo que se separó**: el `SOUL.md` de `publisher`, la skill `implement`, `~/AGENTS.md` (perfiles
@@ -246,5 +246,4 @@ y no hay ningún job de cron. Los tableros: `factory-sandbox` (43 tarjetas hecha
 - Si un worker en un workspace `dir:` carga solo el `AGENTS.md` del repo. Se sabe que hace `chdir` al
   workspace (`gateway/session_kanban.py:195`), pero la regla de la tarjeta igual le dice que lo lea.
 - Quién borra los contenedores por tarjeta del backend `docker` después de un timeout o de un reinicio.
-- Si una ruta de webhook puede correr un comando fijo sin pasar por el modelo.
 - Si hay un tope de gasto nativo por perfil o por tarjeta.

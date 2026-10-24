@@ -71,8 +71,8 @@ const (
 )
 
 // reservedPorts are ports something other than a card listens on: the preview a person
-// serves by hand (8191, and 9191 beside it), the Hermes API and webhooks, and the dashboard.
-var reservedPorts = map[int]bool{8191: true, 9191: true, 8642: true, 8644: true, 9119: true}
+// serves by hand (8191, and 9191 beside it), the Hermes API, and the dashboard.
+var reservedPorts = map[int]bool{8191: true, 9191: true, 8642: true, 9119: true}
 
 // previewPortLine is how a card body names its preview port.
 var previewPortLine = regexp.MustCompile(`(?m)^Preview port: (\d+)$`)
