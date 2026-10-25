@@ -30,6 +30,7 @@ type record struct {
 type reply struct {
 	match []string
 	out   string
+	err   error
 }
 
 func (r *recorder) run(_ context.Context, env []string, stdin, name string, args ...string) (string, error) {
@@ -39,7 +40,7 @@ func (r *recorder) run(_ context.Context, env []string, stdin, name string, args
 	}
 	for _, answer := range r.replies {
 		if hasPrefix(append([]string{name}, args...), answer.match) {
-			return answer.out, nil
+			return answer.out, answer.err
 		}
 	}
 	return "", nil

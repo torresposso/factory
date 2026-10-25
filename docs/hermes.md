@@ -45,12 +45,20 @@ and 0.22.5 is still the newest stable release.
   dispatcher, once, from the **root** profile only (`profile_name` `default`, `cwd` `/opt/data`), with
   `task_id`, `board`, `assignee` and `run_id`. The gateway never consents for itself: until the hook is in
   `/opt/data/shell-hooks-allowlist.json` (or `hooks_auto_accept` is on) it logs "not allowlisted" and skips it.
-  It runs inside the dispatch lock, so it has to return at once.
+  It runs inside the dispatch lock, so it has to return at once. Its `board` is **not** the card's: it is
+  the gateway's current board (`hermes kanban boards switch`), whichever board the claimed card is on —
+  seen on 2026-10-25 with a `factory-sandbox` card whose payload said `torresposso-site`. `factory note`
+  looks the card up on every board for that reason. Blocked and completed carry the right board.
 - Tried again on 2026-10-25 with `coder` and `qa` cards (two completed, one blocked): their hooks fire too,
   and they run in the `hermes` container itself, not in the card's throwaway one — uid 1001, `HOME` the
   profile's home (`/opt/data/profiles/<profile>/home`), the workspace as `cwd`, with `factory`, `gh`, the
   repository's `origin` and the publisher's `gh` login all in reach. The model's tools stay in the sandbox;
   only the hook command, which is the profile's config and not the model's choice, gets out.
+  A worker's hook may read the board but not write it: every process a worker spawns carries
+  `HERMES_DELEGATED_CHILD_CONTEXT`, and the board refuses its writes ("delegate_task child contexts cannot
+  mutate Kanban tasks or boards"). `hermes kanban list` is one of them — it promotes ready cards before it
+  lists — while `show` and `runs` only read. `factory publish --hook` reads the run from the review card up
+  through its parents with `show` for that reason (seen on 2026-10-25, when the first publish failed on `list`).
 - The dispatcher is not a service of its own: it lives inside the gateway that owns the board. On Basecamp
   `kanban.dispatch_interval_seconds` is 10, `review_dispatch` is on, and `max_in_progress` is 3 in the root
   `config.yaml` and in all four profiles, so it does not matter which one the gateway reads.

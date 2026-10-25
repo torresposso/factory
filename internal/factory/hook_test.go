@@ -184,6 +184,45 @@ func TestPublishAndNoteLinksThePullRequest(t *testing.T) {
 	}
 }
 
+// A review card's hook may not write the board, and listing it is a write: the run is
+// read from the review card up through its parents.
+func TestPublishFromTheReviewReadsTheRunThroughItsParents(t *testing.T) {
+	h := publishHarness(t)
+	for id, parents := range map[string][]string{"t_review": {"t_integrate"}, "t_integrate": {"t_21", "t_22"}, "t_22": {"t_21"}} {
+		detail := h.board.details[id]
+		detail.Parents = parents
+		h.board.details[id] = detail
+	}
+	h.factory.Board = FromReview(listless{h.board}, "t_review")
+
+	if err := h.factory.PublishAndNote(context.Background(), 20); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	if len(h.github.opened) != 1 {
+		t.Fatalf("opened %d pull requests; want one", len(h.github.opened))
+	}
+	if body := h.github.opened[0].Body; !strings.Contains(body, "The form creates a Proyecto.") || !strings.Contains(body, "The list is there.") {
+		t.Errorf("the pull request does not report both tickets:\n%s", body)
+	}
+}
+
+func TestFromReviewReportsACardItCannotShow(t *testing.T) {
+	h := publishHarness(t)
+	detail := h.board.details["t_review"]
+	detail.Parents = []string{"t_gone"}
+	h.board.details["t_review"] = detail
+	if _, err := FromReview(h.board, "t_review").List(context.Background()); !errors.Is(err, errNotInFake) {
+		t.Errorf("error = %v; want the board's", err)
+	}
+}
+
+// listless is a board that refuses to be listed, as Hermes refuses a worker's hook.
+type listless struct{ Board }
+
+func (listless) List(context.Context) ([]BoardCard, error) {
+	return nil, errors.New("kanban: delegate_task child contexts cannot mutate Kanban tasks or boards")
+}
+
 // The review card is already done, so a publish that fails says so on the spec, and
 // still fails.
 func TestPublishAndNoteSaysWhyItFailed(t *testing.T) {
@@ -220,7 +259,7 @@ func TestHookOptionsFromTheCardsWorkspace(t *testing.T) {
 		{match: []string{"git", "-C", "/repos/torresposso.site-worktrees/12-21", "remote"}, out: "git@github.com:torresposso/torresposso.site.git\n"},
 		{match: []string{"git", "-C", "/repos/torresposso.site-worktrees/12-21", "rev-parse"}, out: "/repos/torresposso.site/.git\n"},
 	}}
-	opts, err := hookOptions(context.Background(), tools, Hook{Event: hookClaimed, Card: "t_21", Board: "torresposso-site"})
+	opts, err := hookOptions(context.Background(), tools, &Hook{Event: hookClaimed, Card: "t_21", Board: "torresposso-site"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +282,43 @@ func TestHookOptionsOfACardWithoutACheckout(t *testing.T) {
 	tools := &recorder{replies: []reply{
 		{match: []string{"hermes"}, out: `{"task":{"id":"t_1","title":"Rotate the keys","workspace_path":""}}`},
 	}}
-	if _, err := hookOptions(context.Background(), tools, Hook{Event: hookClaimed, Card: "t_1", Board: "default"}); !errors.Is(err, ErrNotARunCard) {
+	if _, err := hookOptions(context.Background(), tools, &Hook{Event: hookClaimed, Card: "t_1", Board: "default"}); !errors.Is(err, ErrNotARunCard) {
 		t.Errorf("error = %v; want ErrNotARunCard", err)
+	}
+}
+
+// The claimed payload names the gateway's current board, whichever board the card is on:
+// the card is found on its own, and the hook is told where.
+func TestHookOptionsFindTheCardOnItsBoard(t *testing.T) {
+	missing := errors.New("hermes: no task t_51")
+	tools := &recorder{replies: []reply{
+		{match: []string{"hermes", "kanban", "--board", "torresposso-site", "show"}, err: missing},
+		{match: []string{"hermes", "kanban", "boards", "list"}, out: `[{"slug":"default"},{"slug":"factory-sandbox"},{"slug":"torresposso-site"}]`},
+		{match: []string{"hermes", "kanban", "--board", "default", "show"}, err: missing},
+		{match: []string{"hermes", "kanban", "--board", "factory-sandbox", "show"}, out: `{"task":{"id":"t_51","title":"#51: the footer","workspace_path":"/repos/factory-sandbox-worktrees/50"}}`},
+		{match: []string{"git", "-C", "/repos/factory-sandbox-worktrees/50", "remote"}, out: "git@github.com:torresposso/factory-sandbox.git\n"},
+		{match: []string{"git", "-C", "/repos/factory-sandbox-worktrees/50", "rev-parse"}, out: "/repos/factory-sandbox/.git\n"},
+	}}
+	hook := Hook{Event: hookClaimed, Card: "t_51", Board: "torresposso-site"}
+	opts, err := hookOptions(context.Background(), tools, &hook)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.Board != "factory-sandbox" || hook.Board != "factory-sandbox" {
+		t.Errorf("board = %q, hook board = %q; want factory-sandbox", opts.Board, hook.Board)
+	}
+	if opts.Repo != "torresposso/factory-sandbox" {
+		t.Errorf("repo = %q", opts.Repo)
+	}
+}
+
+func TestHookOptionsOfACardOnNoBoard(t *testing.T) {
+	tools := &recorder{replies: []reply{
+		{match: []string{"hermes", "kanban", "boards", "list"}, out: `[{"slug":"default"},{"slug":"factory-sandbox"}]`},
+		{match: []string{"hermes", "kanban", "--board"}, err: errors.New("hermes: no task t_gone")},
+	}}
+	_, err := hookOptions(context.Background(), tools, &Hook{Event: hookClaimed, Card: "t_gone", Board: "default"})
+	if err == nil || !strings.Contains(err.Error(), "no task t_gone") {
+		t.Errorf("error = %v; want the board's own complaint", err)
 	}
 }

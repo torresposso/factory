@@ -72,19 +72,23 @@ func ReadHook(in io.Reader) (Hook, error) {
 	}, nil
 }
 
-// HookOptions reads where the hook's card runs. The board is the hook's, and the rest
-// comes from the card's workspace, which is a worktree of the repository: the claimed
-// hook runs in the gateway, far from any checkout.
-func HookOptions(ctx context.Context, hook Hook) (Options, error) {
+// HookOptions reads where the hook's card runs. The board is the one the card is on, and
+// the rest comes from the card's workspace, which is a worktree of the repository: the
+// claimed hook runs in the gateway, far from any checkout.
+//
+// The claimed payload names the gateway's current board, not the card's (Hermes 0.22.5:
+// the dispatcher claims on every board without switching), so the card is looked for on
+// the payload's board first and then on every other; hook.Board is set to where it is.
+func HookOptions(ctx context.Context, hook *Hook) (Options, error) {
 	return hookOptions(ctx, shell{}, hook)
 }
 
-func hookOptions(ctx context.Context, commands runner, hook Hook) (Options, error) {
-	board := &CLIBoard{Board: hook.Board, commands: commands}
-	detail, err := board.Show(ctx, hook.Card)
+func hookOptions(ctx context.Context, commands runner, hook *Hook) (Options, error) {
+	detail, board, err := findCard(ctx, commands, *hook)
 	if err != nil {
 		return Options{}, err
 	}
+	hook.Board = board
 	workspace := detail.Card.WorkspacePath
 	if workspace == "" {
 		return Options{}, fmt.Errorf("%w: %s has no workspace", ErrNotARunCard, hook.Card)
@@ -93,8 +97,36 @@ func hookOptions(ctx context.Context, commands runner, hook Hook) (Options, erro
 	if err != nil {
 		return Options{}, fmt.Errorf("%w: the workspace of %s, %s, is not a checkout: %v", ErrNotARunCard, hook.Card, workspace, err)
 	}
-	opts.Board = hook.Board
+	opts.Board = board
 	return opts, nil
+}
+
+// findCard shows the hook's card on the board the payload names, or else on the first
+// other board that has it.
+func findCard(ctx context.Context, commands runner, hook Hook) (BoardCardDetail, string, error) {
+	detail, first := (&CLIBoard{Board: hook.Board, commands: commands}).Show(ctx, hook.Card)
+	if first == nil {
+		return detail, hook.Board, nil
+	}
+	out, err := commands.run(ctx, nil, "", "hermes", "kanban", "boards", "list", "--json")
+	if err != nil {
+		return BoardCardDetail{}, "", errors.Join(first, err)
+	}
+	var boards []struct {
+		Slug string `json:"slug"`
+	}
+	if err := json.Unmarshal([]byte(out), &boards); err != nil {
+		return BoardCardDetail{}, "", fmt.Errorf("reading the boards: %w", err)
+	}
+	for _, board := range boards {
+		if board.Slug == hook.Board {
+			continue
+		}
+		if detail, err := (&CLIBoard{Board: board.Slug, commands: commands}).Show(ctx, hook.Card); err == nil {
+			return detail, board.Slug, nil
+		}
+	}
+	return BoardCardDetail{}, "", fmt.Errorf("card %s is on no board: %w", hook.Card, first)
 }
 
 // The titles the plan writes, read back: a ticket's card, and the two cards of the run.
@@ -171,6 +203,37 @@ func (f *Factory) ReviewDone(ctx context.Context, hook Hook) (issue int, ok bool
 		return 0, false, err
 	}
 	return card.Run, card.Review, nil
+}
+
+// FromReview is the board as a review card's hook may read it. Hermes keeps a worker's
+// descendants off the board (Hermes 0.22.5), and `hermes kanban list` counts as a write,
+// because it promotes ready cards before it lists, so the run's cards are read from the
+// review card up through its parents with `show` instead.
+func FromReview(board Board, review string) Board {
+	return runGraph{Board: board, review: review}
+}
+
+type runGraph struct {
+	Board
+	review string
+}
+
+func (g runGraph) List(ctx context.Context) ([]BoardCard, error) {
+	var cards []BoardCard
+	seen := map[string]bool{}
+	for queue := []string{g.review}; len(queue) > 0; queue = queue[1:] {
+		if seen[queue[0]] {
+			continue
+		}
+		seen[queue[0]] = true
+		detail, err := g.Board.Show(ctx, queue[0])
+		if err != nil {
+			return nil, err
+		}
+		cards = append(cards, detail.Card)
+		queue = append(queue, detail.Parents...)
+	}
+	return cards, nil
 }
 
 // PublishAndNote publishes the run and says on the spec how it went. The review card is

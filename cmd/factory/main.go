@@ -131,7 +131,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		if hook, err = factory.ReadHook(stdin); err != nil {
 			return err
 		}
-		opts, detected = factory.HookOptions(ctx, hook)
+		opts, detected = factory.HookOptions(ctx, &hook)
 		if errors.Is(detected, factory.ErrNotARunCard) {
 			// Every card of every board fires the claimed hook: one the factory did not
 			// plan is none of its business, and says nothing.
@@ -152,6 +152,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 			return err
 		}
 		issue = spec
+		f.Board = factory.FromReview(f.Board, hook.Card)
 		if !dryRun {
 			// The review card is already done: the comment on the spec is where the
 			// outcome shows, and stdout is the hook's, so the lines go to stderr.
