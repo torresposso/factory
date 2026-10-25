@@ -104,6 +104,43 @@ func TestNoteOfALoneTicketGoesToTheTicket(t *testing.T) {
 	}
 }
 
+// A card that starts moves its issue to In progress, and a ticket's spec with it; one
+// that stops moves its issue to Blocked; one that finishes leaves the move to the pull
+// request. The comment goes first.
+func TestNoteMovesTheIssueOnItsProjects(t *testing.T) {
+	cases := []struct {
+		card, event string
+		want        []status
+	}{
+		{"t_21", hookClaimed, []status{{21, "In progress"}, {20, "In progress"}}},
+		{"t_review", hookClaimed, []status{{20, "In progress"}}},
+		{"t_21", hookBlocked, []status{{21, "Blocked"}}},
+		{"t_21", hookCompleted, nil},
+	}
+	for _, c := range cases {
+		h := noteHarness(t)
+		plan, err := h.factory.Note(context.Background(), Hook{Event: c.event, Card: c.card, Board: "laiacaliente-app"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, first := plan.Steps[0].(CommentStep); !first {
+			t.Errorf("%s %s: the first step is %s; want the comment", c.card, c.event, plan.Steps[0])
+		}
+		if err := h.factory.Apply(context.Background(), plan); err != nil {
+			t.Fatal(err)
+		}
+		if len(h.github.statuses) != len(c.want) {
+			t.Errorf("%s %s: moves = %+v; want %+v", c.card, c.event, h.github.statuses, c.want)
+			continue
+		}
+		for i, move := range c.want {
+			if h.github.statuses[i] != move {
+				t.Errorf("%s %s: moves = %+v; want %+v", c.card, c.event, h.github.statuses, c.want)
+			}
+		}
+	}
+}
+
 // What the worker said is quoted under the program's own line, every line of it.
 func TestNoteQuotesTheWorker(t *testing.T) {
 	h := noteHarness(t)
@@ -227,7 +264,7 @@ func (listless) List(context.Context) ([]BoardCard, error) {
 // still fails.
 func TestPublishAndNoteSaysWhyItFailed(t *testing.T) {
 	h := publishHarness(t)
-	h.github.openErr = errors.New("gh-axi: no permission")
+	h.github.openErr = errors.New("gh: no permission")
 
 	err := h.factory.PublishAndNote(context.Background(), 20)
 	if err == nil || !strings.Contains(err.Error(), "no permission") {

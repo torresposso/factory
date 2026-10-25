@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -171,12 +172,12 @@ func TestBoardArchiveOfNothingRunsNothing(t *testing.T) {
 	}
 }
 
-// The body of a pull request goes in as text: gh-axi reads `--body-file` as a path (there
-// is no `-` for stdin), so a body passed that way fails after the branches are pushed.
-func TestGitHubOpensThePullRequestWithTheBodyAsText(t *testing.T) {
+// A pull request goes out as JSON on stdin, so a body with newlines and backticks
+// arrives whole, under the login that can push.
+func TestGitHubOpensThePullRequestWithJSONOnStdin(t *testing.T) {
 	tools := &recorder{replies: []reply{{
-		match: []string{"gh-axi", "pr", "create"},
-		out:   "pull request created: PR#77 https://github.com/torresposso/laiacaliente-app/pull/77\n",
+		match: []string{"gh", "api", "-X", "POST", "repos/torresposso/laiacaliente-app/pulls"},
+		out:   `{"number":77,"html_url":"https://github.com/torresposso/laiacaliente-app/pull/77"}`,
 	}}}
 	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", Home: "/opt/data/profiles/publisher/home", commands: tools}
 	body := "Closes #20\n\n## Summary\n\nThe «list» is there, and `make verify` passes.\n"
@@ -188,19 +189,16 @@ func TestGitHubOpensThePullRequestWithTheBodyAsText(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 
-	want := []string{
-		"pr", "create",
-		"-R", "torresposso/laiacaliente-app",
-		"--base", "main",
-		"--head", "factory/20",
-		"--title", "Portfolio",
-		"--body", body,
+	want := []string{"api", "-X", "POST", "repos/torresposso/laiacaliente-app/pulls", "--input", "-"}
+	if got := tools.calls[0]; got.Name != "gh" || !equalStrings(got.Args, want) {
+		t.Errorf("open = %s\nwant   gh %s", command(got), strings.Join(want, " "))
 	}
-	if got := tools.calls[0].Args; !equalStrings(got, want) {
-		t.Errorf("open = %s\nwant   gh-axi %s", command(tools.calls[0]), strings.Join(want, " "))
+	var sent map[string]string
+	if err := json.Unmarshal([]byte(tools.calls[0].Stdin), &sent); err != nil {
+		t.Fatalf("stdin is not JSON: %v", err)
 	}
-	if call := command(tools.calls[0]); strings.Contains(call, "--body-file") {
-		t.Errorf("the pull request's body is passed as a file path, which gh-axi reads off the disk: %s", call)
+	if sent["base"] != "main" || sent["head"] != "factory/20" || sent["title"] != "Portfolio" || sent["body"] != body {
+		t.Errorf("sent = %+v", sent)
 	}
 	if got := tools.calls[0].Env; !equalStrings(got, []string{"HOME=/opt/data/profiles/publisher/home"}) {
 		t.Errorf("HOME = %v; want the profile whose login can push", got)
@@ -210,8 +208,16 @@ func TestGitHubOpensThePullRequestWithTheBodyAsText(t *testing.T) {
 	}
 }
 
-// A comment's body is text too, and goes out under the login that can push.
-func TestGitHubCommentsWithTheBodyAsText(t *testing.T) {
+func TestGitHubRefusesAPullRequestWithNoAddress(t *testing.T) {
+	tools := &recorder{replies: []reply{{match: []string{"gh", "api"}, out: `{"message":"odd"}`}}}
+	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", commands: tools}
+	if _, err := hub.OpenPullRequest(context.Background(), NewPullRequest{Base: "main", Head: "factory/20"}); err == nil {
+		t.Error("no error for an answer without html_url")
+	}
+}
+
+// A comment's body is JSON on stdin too, and goes out under the login that can push.
+func TestGitHubCommentsWithJSONOnStdin(t *testing.T) {
 	tools := &recorder{}
 	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", Home: "/opt/data/profiles/publisher/home", commands: tools}
 	body := "The factory's card `t_21` (#21: the list) is done.\n\n> The list is there."
@@ -219,13 +225,72 @@ func TestGitHubCommentsWithTheBodyAsText(t *testing.T) {
 	if err := hub.Comment(context.Background(), 21, body); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"issue", "comment", "21", "-R", "torresposso/laiacaliente-app", "--body", body}
-	if got := tools.calls[0]; got.Name != "gh-axi" || !equalStrings(got.Args, want) {
-		t.Errorf("comment = %s\nwant      gh-axi %s", command(got), strings.Join(want, " "))
+	want := []string{"api", "-X", "POST", "repos/torresposso/laiacaliente-app/issues/21/comments", "--input", "-"}
+	if got := tools.calls[0]; got.Name != "gh" || !equalStrings(got.Args, want) {
+		t.Errorf("comment = %s\nwant      gh %s", command(got), strings.Join(want, " "))
+	}
+	if got := tools.calls[0].Stdin; got != mustJSON(t, map[string]string{"body": body}) {
+		t.Errorf("stdin = %s", got)
 	}
 	if got := tools.calls[0].Env; !equalStrings(got, []string{"HOME=/opt/data/profiles/publisher/home"}) {
 		t.Errorf("HOME = %v; want the profile whose login can push", got)
 	}
+}
+
+// An issue is moved on every project whose Status has the option, matched without
+// regard to case, and left alone on a project without it.
+func TestGitHubSetsTheStatusOnEachProjectThatHasIt(t *testing.T) {
+	tools := &recorder{replies: []reply{{
+		match: []string{"gh", "api", "-X", "POST", "graphql"},
+		out: `{"data":{"repository":{"issue":{"projectItems":{"nodes":[
+			{"id":"item_apps","project":{"id":"proj_apps","field":{"id":"field_apps","options":[{"id":"o_backlog","name":"Backlog"},{"id":"o_progress","name":"In Progress"}]}}},
+			{"id":"item_bare","project":{"id":"proj_bare","field":null}},
+			{"id":"item_other","project":{"id":"proj_other","field":{"id":"field_other","options":[{"id":"o_todo","name":"Todo"}]}}}
+		]}}}}}`,
+	}}}
+	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", Home: "/home", commands: tools}
+
+	if err := hub.SetStatus(context.Background(), 21, "In progress"); err != nil {
+		t.Fatal(err)
+	}
+	if len(tools.calls) != 2 {
+		t.Fatalf("calls = %d; want the query and one move", len(tools.calls))
+	}
+	var query struct {
+		Query     string         `json:"query"`
+		Variables map[string]any `json:"variables"`
+	}
+	if err := json.Unmarshal([]byte(tools.calls[0].Stdin), &query); err != nil {
+		t.Fatal(err)
+	}
+	if query.Variables["owner"] != "torresposso" || query.Variables["name"] != "laiacaliente-app" || query.Variables["number"] != float64(21) {
+		t.Errorf("query variables = %+v", query.Variables)
+	}
+	var move struct {
+		Query     string            `json:"query"`
+		Variables map[string]string `json:"variables"`
+	}
+	if err := json.Unmarshal([]byte(tools.calls[1].Stdin), &move); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"project": "proj_apps", "item": "item_apps", "field": "field_apps", "option": "o_progress"}
+	for key, value := range want {
+		if move.Variables[key] != value {
+			t.Errorf("move %s = %q; want %q", key, move.Variables[key], value)
+		}
+	}
+	if !strings.Contains(move.Query, "updateProjectV2ItemFieldValue") {
+		t.Errorf("the second call is not the move: %s", move.Query)
+	}
+}
+
+func mustJSON(t *testing.T, value any) string {
+	t.Helper()
+	out, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
 }
 
 func TestGitHubReadsArePlainJSON(t *testing.T) {

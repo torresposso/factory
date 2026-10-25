@@ -81,6 +81,22 @@ type fakeGitHub struct {
 	issuesErr  error
 	comments   []comment
 	commentErr error
+	statuses   []status
+	statusErr  error
+}
+
+// status is one move of an issue on its projects.
+type status struct {
+	Issue  int
+	Status string
+}
+
+func (h *fakeGitHub) SetStatus(_ context.Context, number int, to string) error {
+	if h.statusErr != nil {
+		return h.statusErr
+	}
+	h.statuses = append(h.statuses, status{Issue: number, Status: to})
+	return nil
 }
 
 // comment is one comment the factory added to an issue.

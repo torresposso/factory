@@ -78,10 +78,16 @@ and 0.22.5 is still the newest stable release.
   `HOME` set to the publisher profile's home (`/opt/data/profiles/publisher/home` by default, `--gh-home` to
   change it), because that is the profile whose `gh` login can push; no card is assigned to `publisher`
   any more, it is only that login's home (docs/adr/0002). Reads included: `gh api` needs a token.
-- Reads go through `gh api`, whose JSON the program parses. The pull request is opened with
-  `gh-axi pr create`, and the Notes are `gh-axi issue comment <n> -R <repo> --body <text>`.
-- The container needs `git`, `gh`, `gh-axi` and `hermes` on the `PATH`, plus `factory` itself for the
-  hooks: all of them are in the image.
+- Everything goes through `gh api`: reads print the JSON the program parses, and the pull request
+  (`POST repos/<repo>/pulls`), the Notes (`POST repos/<repo>/issues/<n>/comments`) and the Project moves
+  (`graphql`) send JSON on stdin with `--input -`. Since 2026-10-25 that login is the machine account
+  `torrespossobot`, with write on the repositories and on the Project, and the `project` scope; the
+  owner's login stays beside it, inactive (`gh auth switch` brings it back).
+- A Note also moves the card's issue on every Project it is in whose `Status` has the option: to
+  `In progress` when the card is claimed (a ticket's spec too), to `Blocked` when it blocks. In review
+  and Done are the Project's own workflows, moved by the pull request's `Closes #`.
+- The container needs `git`, `gh` and `hermes` on the `PATH`, plus `factory` itself for the hooks:
+  all of them are in the image.
 
 ## A trap
 

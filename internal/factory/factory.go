@@ -192,6 +192,12 @@ type CommentStep struct {
 	Body  string
 }
 
+// StatusStep moves an issue to a Status on the projects it is in.
+type StatusStep struct {
+	Issue  int
+	Status string
+}
+
 func (PullStep) String() string { return "update the base checkout (git pull --ff-only origin main)" }
 
 func (s AddWorktreeStep) String() string { return "worktree " + s.Branch + " at " + s.Path }
@@ -225,6 +231,10 @@ func (s OpenPullRequestStep) String() string {
 func (s CommentStep) String() string {
 	first, _, _ := strings.Cut(s.Body, "\n")
 	return fmt.Sprintf("comment on #%d: %s", s.Issue, first)
+}
+
+func (s StatusStep) String() string {
+	return fmt.Sprintf("move #%d to %s on its projects", s.Issue, s.Status)
 }
 
 // Apply runs the plan, in order. The card ids a step needs are the ids of the cards the
@@ -287,6 +297,8 @@ func (f *Factory) applyStep(ctx context.Context, step Step) error {
 		return nil
 	case CommentStep:
 		return f.GitHub.Comment(ctx, s.Issue, s.Body)
+	case StatusStep:
+		return f.GitHub.SetStatus(ctx, s.Issue, s.Status)
 	default:
 		return fmt.Errorf("unknown step %T", step)
 	}
@@ -415,6 +427,8 @@ func actionOf(step Step) string {
 		return "open-pull-request"
 	case CommentStep:
 		return "comment"
+	case StatusStep:
+		return "set-status"
 	default:
 		return "unknown"
 	}

@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -32,6 +31,9 @@ type GitHub interface {
 	OpenPullRequest(ctx context.Context, pr NewPullRequest) (string, error)
 	// Comment adds a comment to an issue: how the tickets say what the run is doing.
 	Comment(ctx context.Context, number int, body string) error
+	// SetStatus moves the issue to status on every project it is in whose Status field
+	// has that option. An issue in no such project is left alone.
+	SetStatus(ctx context.Context, number int, status string) error
 }
 
 // PullRequest is the little the factory reads about one.
@@ -50,10 +52,9 @@ type NewPullRequest struct {
 	Body  string
 }
 
-// CLIGitHub talks to GitHub through `gh` and `gh-axi`. Reads use `gh api`, whose output
-// is the JSON this package parses; gh-axi renders its answers for a model to read,
-// which is the right shape for a terminal and the wrong one for a parser. The pull
-// request is opened with `gh-axi pr create`, as docs/hermes.md says.
+// CLIGitHub talks to GitHub through `gh api`, reads and writes alike: what it prints is
+// the JSON this package parses, and what it sends is JSON on stdin, so a body with
+// newlines and backticks arrives whole.
 type CLIGitHub struct {
 	// Repo is owner/name.
 	Repo string
@@ -133,44 +134,129 @@ func (g *CLIGitHub) PullRequests(ctx context.Context, branch, state string) ([]P
 	return pulls, nil
 }
 
-// pullRequestURL finds the pull request's address in what gh-axi printed. gh-axi
-// formats its answers for a model, so the address is picked out instead of parsed.
-var pullRequestURL = regexp.MustCompile(`https://[^\s"'<>]+/pull/\d+`)
-
 func (g *CLIGitHub) OpenPullRequest(ctx context.Context, pr NewPullRequest) (string, error) {
-	// The body goes in as text, not through --body-file: gh-axi reads that flag as a
-	// path (there is no `-` for stdin), and its arguments are handed to the command
-	// directly, so a body with newlines and backticks arrives whole.
-	out, err := g.commands.run(ctx, g.env(), "", "gh-axi", "pr", "create",
-		"-R", g.Repo,
-		"--base", pr.Base,
-		"--head", pr.Head,
-		"--title", pr.Title,
-		"--body", pr.Body,
-	)
+	out, err := g.send(ctx, "repos/"+g.Repo+"/pulls", map[string]string{
+		"base":  pr.Base,
+		"head":  pr.Head,
+		"title": pr.Title,
+		"body":  pr.Body,
+	})
 	if err != nil {
 		return "", err
 	}
-	url := pullRequestURL.FindString(out)
-	if url == "" {
-		return "", fmt.Errorf("gh-axi pr create said nothing that looks like a pull request address: %s", strings.TrimSpace(out))
+	var opened struct {
+		HTMLURL string `json:"html_url"`
 	}
-	return url, nil
+	if err := json.Unmarshal([]byte(out), &opened); err != nil || opened.HTMLURL == "" {
+		return "", fmt.Errorf("GitHub's answer to the new pull request names no address: %s", strings.TrimSpace(out))
+	}
+	return opened.HTMLURL, nil
 }
 
 func (g *CLIGitHub) Comment(ctx context.Context, number int, body string) error {
-	// The body goes in as text for the same reason as the pull request's.
-	_, err := g.commands.run(ctx, g.env(), "", "gh-axi", "issue", "comment", strconv.Itoa(number),
-		"-R", g.Repo,
-		"--body", body,
-	)
+	_, err := g.send(ctx, fmt.Sprintf("repos/%s/issues/%d/comments", g.Repo, number), map[string]string{"body": body})
 	return err
+}
+
+// The issue's project items, each with its project's Status field, and the move of one.
+const (
+	projectItemsQuery = `query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      projectItems(first: 20, includeArchived: false) {
+        nodes {
+          id
+          project {
+            id
+            field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } }
+          }
+        }
+      }
+    }
+  }
+}`
+	setStatusMutation = `mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {
+    projectV2Item { id }
+  }
+}`
+)
+
+func (g *CLIGitHub) SetStatus(ctx context.Context, number int, status string) error {
+	owner, name, ok := strings.Cut(g.Repo, "/")
+	if !ok {
+		return fmt.Errorf("repo %q is not owner/name", g.Repo)
+	}
+	out, err := g.graphQL(ctx, projectItemsQuery, map[string]any{"owner": owner, "name": name, "number": number})
+	if err != nil {
+		return err
+	}
+	var answer struct {
+		Data struct {
+			Repository struct {
+				Issue struct {
+					ProjectItems struct {
+						Nodes []struct {
+							ID      string `json:"id"`
+							Project struct {
+								ID    string `json:"id"`
+								Field *struct {
+									ID      string `json:"id"`
+									Options []struct {
+										ID   string `json:"id"`
+										Name string `json:"name"`
+									} `json:"options"`
+								} `json:"field"`
+							} `json:"project"`
+						} `json:"nodes"`
+					} `json:"projectItems"`
+				} `json:"issue"`
+			} `json:"repository"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(out), &answer); err != nil {
+		return fmt.Errorf("reading the projects of #%d: %w", number, err)
+	}
+	var errs []error
+	for _, item := range answer.Data.Repository.Issue.ProjectItems.Nodes {
+		field := item.Project.Field
+		if field == nil {
+			continue
+		}
+		for _, option := range field.Options {
+			if !strings.EqualFold(option.Name, status) {
+				continue
+			}
+			if _, err := g.graphQL(ctx, setStatusMutation, map[string]any{
+				"project": item.Project.ID, "item": item.ID, "field": field.ID, "option": option.ID,
+			}); err != nil {
+				errs = append(errs, err)
+			}
+			break
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // api runs one read against the GitHub API.
 func (g *CLIGitHub) api(ctx context.Context, path string, extra ...string) (string, error) {
 	args := append([]string{"api", path}, extra...)
 	return g.commands.run(ctx, g.env(), "", "gh", args...)
+}
+
+// send posts fields to the GitHub API as JSON on stdin.
+func (g *CLIGitHub) send(ctx context.Context, path string, fields any) (string, error) {
+	input, err := json.Marshal(fields)
+	if err != nil {
+		return "", err
+	}
+	return g.commands.run(ctx, g.env(), string(input), "gh", "api", "-X", "POST", path, "--input", "-")
+}
+
+// graphQL runs one query or mutation. `gh api graphql` exits non-zero when GitHub
+// answers with errors, so a failed move is an error here too.
+func (g *CLIGitHub) graphQL(ctx context.Context, query string, variables map[string]any) (string, error) {
+	return g.send(ctx, "graphql", map[string]any{"query": query, "variables": variables})
 }
 
 func (g *CLIGitHub) env() []string {

@@ -20,6 +20,14 @@ const (
 	hookCompleted = "kanban_task_completed"
 )
 
+// The Status a card's issue takes on its projects when the card starts, and when it
+// stops for an answer. A project without the option is left alone; the rest of the
+// way, In review and Done, is the project's own workflows, moved by the pull request.
+const (
+	projectInProgress = "In progress"
+	projectBlocked    = "Blocked"
+)
+
 // Hook is what Hermes hands a shell hook on stdin when a card changes.
 type Hook struct {
 	Event string
@@ -168,7 +176,9 @@ func (f *Factory) readRunCard(ctx context.Context, id string) (cardOfRun, error)
 
 // Note is the comment a hook leaves on the card's issue: that the card started, why it
 // stopped, or what it did. The wording is the program's; what the worker reported is
-// quoted, never rewritten.
+// quoted, never rewritten. A card that starts moves its issue, and the spec with it, to
+// In progress; one that stops moves its issue to Blocked. The comment goes first, so a
+// project that refuses the move still gets the word out.
 func (f *Factory) Note(ctx context.Context, hook Hook) (*Plan, error) {
 	card, err := f.readRunCard(ctx, hook.Card)
 	if err != nil {
@@ -176,17 +186,23 @@ func (f *Factory) Note(ctx context.Context, hook Hook) (*Plan, error) {
 	}
 	name := fmt.Sprintf("`%s` (%s)", card.Card.ID, card.Card.Title)
 	var body string
+	var moves []Step
 	switch hook.Event {
 	case hookClaimed:
 		body = fmt.Sprintf("The factory is working on this: card %s started on board `%s`, run %d.", name, hook.Board, hook.Run)
+		moves = append(moves, StatusStep{Issue: card.Issue, Status: projectInProgress})
+		if card.Run != card.Issue {
+			moves = append(moves, StatusStep{Issue: card.Run, Status: projectInProgress})
+		}
 	case hookBlocked:
 		body = fmt.Sprintf("The factory's card %s is blocked and waits for an answer on board `%s`.", name, hook.Board) +
 			quoted(hook.Reason, "Its worker gave no reason.")
+		moves = append(moves, StatusStep{Issue: card.Issue, Status: projectBlocked})
 	case hookCompleted:
 		body = fmt.Sprintf("The factory's card %s is done.", name) +
 			quoted(hook.Summary, "Its worker reported no summary.")
 	}
-	return &Plan{Issue: card.Run, Steps: []Step{CommentStep{Issue: card.Issue, Body: body}}}, nil
+	return &Plan{Issue: card.Run, Steps: append([]Step{CommentStep{Issue: card.Issue, Body: body}}, moves...)}, nil
 }
 
 // ReviewDone is the run a hook says is ready to publish: the run whose review card it
