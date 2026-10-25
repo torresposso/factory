@@ -40,8 +40,9 @@ const DefaultHome = "/opt/data/profiles/publisher/home"
 
 // DetectOptions reads where a run happens from the checkout dir is in, so one binary
 // serves every repository: the repository is origin's, the clone is the main checkout
-// (also from a worktree, which is where the publisher card runs), the worktrees sit
-// beside it in <clone>-worktrees, and the board is named after the repository.
+// (also from a worktree, which is where a card's hooks run), the worktrees sit
+// beside it in <clone>-worktrees, and the board is named after the repository. The
+// hooks read them from their card's workspace instead (HookOptions).
 func DetectOptions(ctx context.Context, dir string) (Options, error) {
 	return detectOptions(ctx, shell{}, dir)
 }
@@ -157,7 +158,7 @@ type ArchiveCardsStep struct{ IDs []string }
 // CreateCardStep creates one card and remembers its board id under Key, so a later
 // card can name it as a parent or in its body.
 type CreateCardStep struct {
-	// Key names the card inside this run: "code:57", "integrate", "review", "publish".
+	// Key names the card inside this run: "code:57", "integrate", "review".
 	Key string
 	// Card is what the board is asked for. Its Body is empty: Body() builds it.
 	Card NewCard
@@ -184,6 +185,12 @@ type PublishEvidenceStep struct {
 
 // OpenPullRequestStep opens the run's one pull request.
 type OpenPullRequestStep struct{ PullRequest NewPullRequest }
+
+// CommentStep comments on an issue: a ticket, or the spec.
+type CommentStep struct {
+	Issue int
+	Body  string
+}
 
 func (PullStep) String() string { return "update the base checkout (git pull --ff-only origin main)" }
 
@@ -213,6 +220,11 @@ func (s PublishEvidenceStep) String() string {
 
 func (s OpenPullRequestStep) String() string {
 	return fmt.Sprintf("open the pull request %s -> %s", s.PullRequest.Head, s.PullRequest.Base)
+}
+
+func (s CommentStep) String() string {
+	first, _, _ := strings.Cut(s.Body, "\n")
+	return fmt.Sprintf("comment on #%d: %s", s.Issue, first)
 }
 
 // Apply runs the plan, in order. The card ids a step needs are the ids of the cards the
@@ -273,6 +285,8 @@ func (f *Factory) applyStep(ctx context.Context, step Step) error {
 		}
 		f.URL = url
 		return nil
+	case CommentStep:
+		return f.GitHub.Comment(ctx, s.Issue, s.Body)
 	default:
 		return fmt.Errorf("unknown step %T", step)
 	}
@@ -296,7 +310,14 @@ type Report struct {
 	Worktrees   []WorktreeReport   `json:"worktrees"`
 	Cards       []CardReport       `json:"cards"`
 	PullRequest *PullRequestReport `json:"pull_request,omitempty"`
+	Comments    []CommentReport    `json:"comments,omitempty"`
 	Steps       []StepReport       `json:"steps"`
+}
+
+// CommentReport is a comment the plan adds to an issue, body and all.
+type CommentReport struct {
+	Issue int    `json:"issue"`
+	Body  string `json:"body"`
 }
 
 // WorktreeReport is one worktree the plan creates.
@@ -348,6 +369,8 @@ func NewReport(plan *Plan, board string, dryRun bool) Report {
 				Title: s.PullRequest.Title,
 				Body:  s.PullRequest.Body,
 			}
+		case CommentStep:
+			report.Comments = append(report.Comments, CommentReport{Issue: s.Issue, Body: s.Body})
 		case CreateCardStep:
 			report.Cards = append(report.Cards, CardReport{
 				Key:               s.Key,
@@ -390,6 +413,8 @@ func actionOf(step Step) string {
 		return "publish-evidence"
 	case OpenPullRequestStep:
 		return "open-pull-request"
+	case CommentStep:
+		return "comment"
 	default:
 		return "unknown"
 	}

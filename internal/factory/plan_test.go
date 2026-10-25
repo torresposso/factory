@@ -25,7 +25,7 @@ func (h *harness) lone(number int, title string) {
 }
 
 // One ticket is the whole run: one worktree on the run's own branch, one coder card,
-// a review card that reads the coder's work, and a publisher.
+// and a review card that reads the coder's work. Its hook publishes: no card follows it.
 func TestPlanOfALoneTicket(t *testing.T) {
 	h := newHarness(t)
 	h.lone(7, "The mobile menu")
@@ -36,11 +36,11 @@ func TestPlanOfALoneTicket(t *testing.T) {
 	if got := addedOf(plan); !equalWorktrees(got, want) {
 		t.Errorf("worktrees = %v; want %v", got, want)
 	}
-	if got := actionsOf(plan); !equalStrings(got, []string{"pull", "add-worktree", "create-card", "create-card", "create-card"}) {
-		t.Errorf("steps = %v; want a pull, one worktree and three cards", got)
+	if got := actionsOf(plan); !equalStrings(got, []string{"pull", "add-worktree", "create-card", "create-card"}) {
+		t.Errorf("steps = %v; want a pull, one worktree and two cards", got)
 	}
-	if got := keysOf(plan); strings.TrimSpace(got) != "code:7 review publish" {
-		t.Errorf("cards = %q; want the coder, the review and the publisher", got)
+	if got := keysOf(plan); strings.TrimSpace(got) != "code:7 review" {
+		t.Errorf("cards = %q; want the coder and the review", got)
 	}
 
 	card := cardByKey(t, plan, "code:7")
@@ -74,13 +74,6 @@ func TestPlanOfALoneTicket(t *testing.T) {
 		t.Errorf("the review card of a lone ticket should carry the ticket once and no spec:\n%s", body)
 	}
 
-	publisher := cardByKey(t, plan, "publish")
-	if publisher.Card.Assignee != "publisher" || publisher.Card.MaxRuntime != runtimePublisher {
-		t.Errorf("publisher card = %+v", publisher.Card)
-	}
-	if !equalStrings(publisher.Parents, []string{"review"}) {
-		t.Errorf("publisher parents = %v; want the review card", publisher.Parents)
-	}
 }
 
 // Several tickets get a worktree each, on their own branch, plus the one where the
@@ -104,7 +97,7 @@ func TestPlanOfSeveralTickets(t *testing.T) {
 		t.Errorf("worktrees = %v; want %v", got, want)
 	}
 
-	wantKeys := []string{"code:21", "code:22", "code:23", "integrate", "review", "publish"}
+	wantKeys := []string{"code:21", "code:22", "code:23", "integrate", "review"}
 	if got := keysOf(plan); strings.TrimSpace(got) != strings.Join(wantKeys, " ") {
 		t.Errorf("cards = %q; want %v", got, wantKeys)
 	}
@@ -145,13 +138,6 @@ func TestPlanOfSeveralTickets(t *testing.T) {
 	if !equalStrings(review.Parents, []string{"integrate"}) {
 		t.Errorf("review parents = %v", review.Parents)
 	}
-	publisher := cardByKey(t, plan, "publish")
-	if !equalStrings(publisher.Parents, []string{"review"}) {
-		t.Errorf("publisher parents = %v; want the review card", publisher.Parents)
-	}
-	if !strings.Contains(publisher.Body(nil), "factory publish --issue 20") {
-		t.Errorf("the publisher rules do not hand the work to factory publish:\n%s", publisher.Body(nil))
-	}
 }
 
 // The idempotency keys are what makes a second run of the same spec return the same
@@ -171,7 +157,6 @@ func TestPlanCardsCarryTheIdempotencyKeysOfTheRoute(t *testing.T) {
 		"code:22":   "laiacaliente-app#20:code:22",
 		"integrate": "laiacaliente-app#20:integrate",
 		"review":    "laiacaliente-app#20:review",
-		"publish":   "laiacaliente-app#20:publish",
 	}
 	for key, idempotency := range want {
 		if got := cardByKey(t, plan, key).Card.IdempotencyKey; got != idempotency {
@@ -298,7 +283,7 @@ func TestPlanClearsAnEarlierRunOfTheSameIssue(t *testing.T) {
 
 	plan := h.plan(t, 7)
 
-	want := []string{"pull", "archive-cards", "remove-worktree", "remove-worktree", "add-worktree", "create-card", "create-card", "create-card"}
+	want := []string{"pull", "archive-cards", "remove-worktree", "remove-worktree", "add-worktree", "create-card", "create-card"}
 	if got := actionsOf(plan); !equalStrings(got, want) {
 		t.Errorf("steps = %v; want %v", got, want)
 	}
@@ -435,8 +420,8 @@ func TestApplyResolvesTheCardIds(t *testing.T) {
 		t.Errorf("worktrees = %v; want %v", gotTrees, wantTrees)
 	}
 
-	if len(h.board.created) != 5 {
-		t.Fatalf("created %d cards; want 5", len(h.board.created))
+	if len(h.board.created) != 4 {
+		t.Fatalf("created %d cards; want 4", len(h.board.created))
 	}
 	byKey := map[string]createdCard{}
 	for _, created := range h.board.created {
@@ -509,8 +494,8 @@ func TestReportMatchesThePlan(t *testing.T) {
 	if len(report.Steps) != len(plan.Steps) {
 		t.Errorf("the report has %d steps and the plan %d", len(report.Steps), len(plan.Steps))
 	}
-	if len(report.Cards) != 5 || len(report.Worktrees) != 3 {
-		t.Errorf("report = %d cards, %d worktrees; want 5 and 3", len(report.Cards), len(report.Worktrees))
+	if len(report.Cards) != 4 || len(report.Worktrees) != 3 {
+		t.Errorf("report = %d cards, %d worktrees; want 4 and 3", len(report.Cards), len(report.Worktrees))
 	}
 	for _, card := range report.Cards {
 		if card.Body == "" || card.IdempotencyKey == "" || card.Key == "" {

@@ -17,7 +17,7 @@ func cleanHarness(t *testing.T, status string) *harness {
 	}
 	h.board.cards = []BoardCard{
 		{ID: "t_code", Title: "#7: The mobile menu", Status: status, WorkspacePath: "/trees/7"},
-		{ID: "t_publish", Title: "Publish #7", Status: status, WorkspacePath: "/trees/7"},
+		{ID: "t_review", Title: "Review #7: The mobile menu", Status: status, WorkspacePath: "/trees/7"},
 		{ID: "t_other", Title: "another run", Status: "running", WorkspacePath: "/trees/70"},
 	}
 	h.git.trees = []Worktree{
@@ -73,7 +73,7 @@ func TestCleanArchivesTheCardsThatNeverGotDone(t *testing.T) {
 		t.Errorf("steps = %v; want %v", got, want)
 	}
 	archive, ok := plan.Steps[0].(ArchiveCardsStep)
-	if !ok || !equalStrings(archive.IDs, []string{"t_publish"}) {
+	if !ok || !equalStrings(archive.IDs, []string{"t_review"}) {
 		t.Errorf("archived = %+v; want the card that is not done, and no other", plan.Steps[0])
 	}
 }
@@ -106,7 +106,7 @@ func TestCleanListsBeforeItDeletes(t *testing.T) {
 	if err := h.factory.Apply(context.Background(), plan); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
-	if !equalStrings(h.board.archived, []string{"t_code", "t_publish"}) {
+	if !equalStrings(h.board.archived, []string{"t_code", "t_review"}) {
 		t.Errorf("archived = %v", h.board.archived)
 	}
 	if len(h.git.removed) != 2 || h.git.removed[0].Path != "/trees/7" {

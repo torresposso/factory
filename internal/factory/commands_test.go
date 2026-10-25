@@ -209,6 +209,24 @@ func TestGitHubOpensThePullRequestWithTheBodyAsText(t *testing.T) {
 	}
 }
 
+// A comment's body is text too, and goes out under the login that can push.
+func TestGitHubCommentsWithTheBodyAsText(t *testing.T) {
+	tools := &recorder{}
+	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", Home: "/opt/data/profiles/publisher/home", commands: tools}
+	body := "The factory's card `t_21` (#21: the list) is done.\n\n> The list is there."
+
+	if err := hub.Comment(context.Background(), 21, body); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"issue", "comment", "21", "-R", "torresposso/laiacaliente-app", "--body", body}
+	if got := tools.calls[0]; got.Name != "gh-axi" || !equalStrings(got.Args, want) {
+		t.Errorf("comment = %s\nwant      gh-axi %s", command(got), strings.Join(want, " "))
+	}
+	if got := tools.calls[0].Env; !equalStrings(got, []string{"HOME=/opt/data/profiles/publisher/home"}) {
+		t.Errorf("HOME = %v; want the profile whose login can push", got)
+	}
+}
+
 func TestGitHubReadsArePlainJSON(t *testing.T) {
 	tools := &recorder{replies: []reply{
 		{match: []string{"gh", "api", "repos/torresposso/laiacaliente-app/issues/20/sub_issues"}, out: `[[{"number":21,"state":"open"}],[{"number":22,"state":"closed"}]]`},
@@ -504,7 +522,7 @@ func TestBoardEverywhereReadsEveryBoard(t *testing.T) {
 }
 
 // From a worktree the clone is still the main checkout: git's common dir is the main
-// checkout's .git, and the publisher card runs in the run's worktree.
+// checkout's .git, and the hooks run in the run's worktree.
 func TestDetectOptionsFromAWorktree(t *testing.T) {
 	tools := &recorder{replies: []reply{
 		{match: []string{"git", "-C", "/repos/torresposso.site-worktrees/12", "remote"}, out: "git@github.com:torresposso/torresposso.site.git\n"},

@@ -16,7 +16,6 @@ func TestEveryRulesFileRenders(t *testing.T) {
 	want := map[string]bool{
 		"coder-rules.txt":       false,
 		"integration-rules.txt": false,
-		"publisher-rules.txt":   false,
 		"review-rules.txt":      false,
 	}
 	for _, entry := range entries {
@@ -207,30 +206,6 @@ func TestReviewCardBody(t *testing.T) {
 	}
 }
 
-// The publisher card is one command: the rules send it to `factory publish`, so the card
-// never becomes a second implementation of the publishing.
-func TestPublisherCardBody(t *testing.T) {
-	h := newHarness(t)
-	h.spec(20, "Portfolio",
-		[]Issue{open(21, "the list"), open(22, "the form")},
-		map[int][]int{21: nil, 22: {21}},
-	)
-	plan := h.plan(t, 20)
-
-	body := cardByKey(t, plan, "publish").Body(nil)
-
-	for _, want := range []string{
-		"#21, #22",
-		"factory publish --issue 20",
-		"## Publisher rules",
-		"factory/20",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the publisher card does not contain %q:\n%s", want, body)
-		}
-	}
-}
-
 // The bodies are concatenated text, with the section headings Markdown reads and one
 // blank line between the parts: a card body with runs of blank lines is a card that is
 // painful to read in the terminal.
@@ -257,7 +232,7 @@ func TestCardBodiesHaveNoRunsOfBlankLines(t *testing.T) {
 // name the Makefile contract (verify, preview, preview-stop) and nothing one repository has.
 func TestRulesNameOnlyTheMakefileContract(t *testing.T) {
 	data := rulesData{Repo: "torresposso/laiacaliente-app", Issue: 20, Ticket: 21, Branch: "factory/20-21"}
-	for _, name := range []string{"coder-rules.txt", "integration-rules.txt", "review-rules.txt", "publisher-rules.txt"} {
+	for _, name := range []string{"coder-rules.txt", "integration-rules.txt", "review-rules.txt"} {
 		rendered := rules(name, data)
 		for _, unwanted := range []string{"make css", "app.css", "pocketbase-bin", "internal/web", "PocketBase"} {
 			if strings.Contains(rendered, unwanted) {

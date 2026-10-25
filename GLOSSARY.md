@@ -37,6 +37,10 @@ The Card that checks the Run's branch against the Spec. Every Run has one.
 **Publish**:
 Opening the Run's one pull request from its branch.
 
+**Note**:
+The comment the factory leaves on a Card's issue when the Card is claimed, blocked or completed: a
+ticket's Card on its ticket, Integrate and Review on the Spec. A kanban hook writes it, never a model.
+
 **Evidence**:
 What shows the change works, in the pull request: each Card's reported checks and up to three
 screenshots per Card.

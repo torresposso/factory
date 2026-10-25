@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -29,6 +30,8 @@ type GitHub interface {
 	PullRequests(ctx context.Context, branch, state string) ([]PullRequest, error)
 	// OpenPullRequest opens a pull request and returns its address.
 	OpenPullRequest(ctx context.Context, pr NewPullRequest) (string, error)
+	// Comment adds a comment to an issue: how the tickets say what the run is doing.
+	Comment(ctx context.Context, number int, body string) error
 }
 
 // PullRequest is the little the factory reads about one.
@@ -153,6 +156,15 @@ func (g *CLIGitHub) OpenPullRequest(ctx context.Context, pr NewPullRequest) (str
 		return "", fmt.Errorf("gh-axi pr create said nothing that looks like a pull request address: %s", strings.TrimSpace(out))
 	}
 	return url, nil
+}
+
+func (g *CLIGitHub) Comment(ctx context.Context, number int, body string) error {
+	// The body goes in as text for the same reason as the pull request's.
+	_, err := g.commands.run(ctx, g.env(), "", "gh-axi", "issue", "comment", strconv.Itoa(number),
+		"-R", g.Repo,
+		"--body", body,
+	)
+	return err
 }
 
 // api runs one read against the GitHub API.

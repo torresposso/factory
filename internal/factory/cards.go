@@ -14,15 +14,12 @@ import (
 //go:embed templates
 var templates embed.FS
 
-// The profiles the cards are assigned to, and how long each may run. The publisher's
-// card runs one command, so it gets the shortest cap.
+// The profiles the cards are assigned to, and how long a card may run.
 const (
-	assigneeCoder     = "coder"
-	assigneeQA        = "qa"
-	assigneePublisher = "publisher"
+	assigneeCoder = "coder"
+	assigneeQA    = "qa"
 
-	runtimeCoder     = 2700
-	runtimePublisher = 900
+	runtimeCoder = 2700
 )
 
 // rulesData is what the embedded rules interpolate.
@@ -131,21 +128,6 @@ func (f *Factory) reviewBody(run PlannedRun) string {
 		rules("review-rules.txt", rulesData{Repo: f.Opts.Repo, Issue: issue, Branch: branch}),
 	)
 	return cardBody(parts...)
-}
-
-// publisherBody is the publisher card: which issues the pull request closes, and the
-// rules, which hand the work to this program.
-func (f *Factory) publisherBody(run PlannedRun) string {
-	issue := run.Spec.Number
-	numbers := make([]string, 0, len(run.Tickets))
-	for _, ticket := range run.Tickets {
-		numbers = append(numbers, fmt.Sprintf("#%d", ticket.Issue.Number))
-	}
-	branch := branch(issue)
-	return cardBody(
-		section("Closes", strings.Join(numbers, ", ")),
-		rules("publisher-rules.txt", rulesData{Repo: f.Opts.Repo, Issue: issue, Branch: branch}),
-	)
 }
 
 // section is one `## Heading` block of a card body.

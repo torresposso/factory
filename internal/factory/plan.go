@@ -246,14 +246,15 @@ func (f *Factory) worktreeSteps(run PlannedRun, issue int) []Step {
 
 // cardSteps is the run's cards, in the order the board needs them: a ticket's card
 // after the cards it is blocked by (which the ticket order already guarantees), then
-// the card where the branches meet (when there are several), the review, and the
-// publisher. Every run has a review card: the coder never reviews its own work.
+// the card where the branches meet (when there are several), and the review. Every run
+// has a review card: the coder never reviews its own work. Nothing follows it: the
+// review's completed hook publishes the run (docs/adr/0002).
 func (f *Factory) cardSteps(run PlannedRun, issue int) []Step {
 	steps := f.ticketCards(run, issue)
 	if !run.single() {
 		steps = append(steps, f.integrationCard(run, issue))
 	}
-	return append(steps, f.reviewCard(run, issue), f.publisherCard(run, issue))
+	return append(steps, f.reviewCard(run, issue))
 }
 
 // ticketCards is one coder card per ticket, in the order the tickets came.
@@ -333,22 +334,5 @@ func (f *Factory) reviewCard(run PlannedRun, issue int) Step {
 		},
 		Parents: parents,
 		Body:    func(map[string]string) string { return f.reviewBody(run) },
-	}
-}
-
-// publisherCard opens the pull request. Its rules hand the work to `factory publish`,
-// so the card is a one-command turn and not a second implementation.
-func (f *Factory) publisherCard(run PlannedRun, issue int) Step {
-	return CreateCardStep{
-		Key: "publish",
-		Card: NewCard{
-			Title:          fmt.Sprintf("Publish #%d: %s", issue, run.Spec.Title),
-			Assignee:       assigneePublisher,
-			Workspace:      runWorktree(f.Opts.Trees, issue),
-			MaxRuntime:     runtimePublisher,
-			IdempotencyKey: idempotencyKey(f.Opts.Board, issue, "publish"),
-		},
-		Parents: []string{"review"},
-		Body:    func(map[string]string) string { return f.publisherBody(run) },
 	}
 }

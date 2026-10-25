@@ -19,8 +19,6 @@ func integrateCardTitle(issue int) string { return fmt.Sprintf("Integrate #%d: "
 
 func reviewCardTitle(issue int) string { return fmt.Sprintf("Review #%d: ", issue) }
 
-func publishCardTitle(issue int) string { return fmt.Sprintf("Publish #%d: ", issue) }
-
 // runCard is one card of a run as the board reports it: what the card did, and what its
 // worker said it verified.
 type runCard struct {
@@ -132,15 +130,13 @@ func cardRole(run PlannedRun, card BoardCard) string {
 		return "review"
 	case strings.HasPrefix(card.Title, integrateCardTitle(run.Spec.Number)):
 		return "integration"
-	case strings.HasPrefix(card.Title, publishCardTitle(run.Spec.Number)):
-		return "publisher"
 	default:
 		return "coder"
 	}
 }
 
 // orderRunCards puts a run's cards in the order the plan created them: the tickets in
-// their order, then integration, review and publish. A card of another run, or one the
+// their order, then integration and review. A card of another run, or one the
 // plan did not write, sorts last.
 func orderRunCards(run PlannedRun, cards []BoardCard) []BoardCard {
 	rank := func(card BoardCard) int {
@@ -155,10 +151,8 @@ func orderRunCards(run PlannedRun, cards []BoardCard) []BoardCard {
 			return len(run.Tickets)
 		case strings.HasPrefix(card.Title, reviewCardTitle(issue)):
 			return len(run.Tickets) + 1
-		case strings.HasPrefix(card.Title, publishCardTitle(issue)):
-			return len(run.Tickets) + 2
 		default:
-			return len(run.Tickets) + 3
+			return len(run.Tickets) + 2
 		}
 	}
 	ordered := append([]BoardCard{}, cards...)
@@ -355,9 +349,6 @@ func lastCardSummary(run PlannedRun, cards []runCard) string {
 func (f *Factory) evidenceBody(run PlannedRun, cards []runCard, images []EvidenceImage, gate BoardCard) string {
 	lines := []string{}
 	for _, card := range cards {
-		if strings.HasPrefix(card.Card.Title, publishCardTitle(run.Spec.Number)) {
-			continue
-		}
 		lines = append(lines, fmt.Sprintf("- %s — %s", card.Card.Title, verified(card, card.Card.ID == gate.ID)))
 		for _, check := range card.Verification {
 			lines = append(lines, "  - "+check)

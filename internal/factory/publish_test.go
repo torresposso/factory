@@ -46,14 +46,12 @@ func publishHarness(t *testing.T) *harness {
 		{ID: "t_22", Title: "#22: the form", Status: statusDone, WorkspacePath: "/trees/20-22"},
 		{ID: "t_integrate", Title: "Integrate #20: Portfolio", Status: statusDone, WorkspacePath: "/trees/20"},
 		{ID: "t_review", Title: "Review #20: Portfolio", Status: statusDone, WorkspacePath: "/trees/20"},
-		{ID: "t_publish", Title: "Publish #20: Portfolio", Status: "todo", WorkspacePath: "/trees/20"},
 	}
 	h.board.details = map[string]BoardCardDetail{
 		"t_21":        {Card: h.board.cards[0], Summary: "The list is there."},
 		"t_22":        {Card: h.board.cards[1], Summary: "The form creates a Proyecto."},
 		"t_integrate": {Card: h.board.cards[2], Summary: "Both branches merged clean."},
 		"t_review":    {Card: h.board.cards[3], Summary: "Reviewed the branch: the list and the form are what the spec asks for."},
-		"t_publish":   {Card: h.board.cards[4], Summary: ""},
 	}
 	h.board.runs = map[string][]CardRun{
 		"t_21": {{Profile: "coder", Status: "done", Metadata: metadata(fieldsOf(21, "make verify (exit 0)", "1111111aaaaaaa"))}},
@@ -64,7 +62,6 @@ func publishHarness(t *testing.T) *harness {
 		"t_review": {{Profile: "qa", Status: "done", Metadata: metadata(map[string]string{
 			MetadataVerification: "make verify (exit 0)", MetadataBranch: "factory/20", MetadataCommit: "4444444ddddddd",
 		})}},
-		"t_publish": {},
 	}
 	h.git.diff = Diff{
 		Files:      []string{"internal/web/portfolio.go", "internal/web/portfolio.templ"},
@@ -222,12 +219,10 @@ func TestPublishOfALoneTicket(t *testing.T) {
 	h.board.cards = []BoardCard{
 		{ID: "t_code", Title: "#7: The mobile menu", Status: statusDone, WorkspacePath: "/trees/7"},
 		{ID: "t_review", Title: "Review #7: The mobile menu", Status: statusDone, WorkspacePath: "/trees/7"},
-		{ID: "t_publish", Title: "Publish #7: The mobile menu", Status: "todo", WorkspacePath: "/trees/7"},
 	}
 	h.board.details = map[string]BoardCardDetail{
-		"t_code":    {Card: h.board.cards[0], Summary: "The drawer opens on mobile."},
-		"t_review":  {Card: h.board.cards[1], Summary: "Reviewed; the drawer closes on the overlay."},
-		"t_publish": {Card: h.board.cards[2]},
+		"t_code":   {Card: h.board.cards[0], Summary: "The drawer opens on mobile."},
+		"t_review": {Card: h.board.cards[1], Summary: "Reviewed; the drawer closes on the overlay."},
 	}
 	h.board.runs = map[string][]CardRun{
 		"t_code": {{Profile: "coder", Status: "done", Metadata: metadata(map[string]string{
@@ -477,7 +472,6 @@ func TestOrderRunCardsFollowsThePlan(t *testing.T) {
 		Tickets: []Ticket{{Issue: Issue{Number: 21}}, {Issue: Issue{Number: 22}}},
 	}
 	cards := []BoardCard{
-		{ID: "publish", Title: "Publish #20: Portfolio"},
 		{ID: "review", Title: "Review #20: Portfolio"},
 		{ID: "second", Title: "#22: the form"},
 		{ID: "integrate", Title: "Integrate #20: Portfolio"},
@@ -489,7 +483,7 @@ func TestOrderRunCardsFollowsThePlan(t *testing.T) {
 	for _, card := range ordered {
 		ids = append(ids, card.ID)
 	}
-	if !equalStrings(ids, []string{"first", "second", "integrate", "review", "publish"}) {
+	if !equalStrings(ids, []string{"first", "second", "integrate", "review"}) {
 		t.Errorf("order = %v", ids)
 	}
 }

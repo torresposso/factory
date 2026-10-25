@@ -19,11 +19,12 @@ de código, al repo de Hermes. Lo que no se probó corriendo algo está marcado 
    (`docs: kanban-worker-lanes.md`). Los traspasos entre roles van en tarjetas, que sobreviven a un reinicio y
    quedan registradas. `delegate_task` sirve solo para lecturas cortas en paralelo dentro de una tarjeta
    (`docs: kanban.md:97-122`).
-2. **Basecamp va dos versiones menores atrás.** Tiene `v0.21.6` y la última es `v0.22.5`, del 2026-10-23
-   ([release](https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.5)). La CLI del kanban y su
-   modelo de datos casi no cambiaron, así que actualizar no rompe a `factory`. Lo que se gana es robustez:
-   ya no quedan tarjetas pegadas en `running` cuando un worker muere en un reinicio (commit `9dae8d87ef`),
-   y los workers sí registran shell hooks (commit `fcc895496e`).
+2. **Basecamp va al día.** La investigación empezó con `v0.21.6`, dos versiones menores atrás, y la misma
+   tarde quedó en `v0.22.5`, del 2026-10-23
+   ([release](https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.5)), que sigue siendo la última
+   versión estable. La CLI del kanban y su modelo de datos casi no cambiaron, así que actualizar no rompió a
+   `factory`. Lo que se ganó es robustez: ya no quedan tarjetas pegadas en `running` cuando un worker muere
+   en un reinicio (commit `9dae8d87ef`), y los workers sí registran shell hooks (commit `fcc895496e`).
 3. **El webhook todavía no usa el programa.** Las rutas `github-torresposso-site` y `github-factory-sandbox`
    siguen con el prompt viejo de unas 140 líneas, en el que el perfil `orchestrator` corre git, gh y kanban él
    mismo. `factory plan` solo se ha corrido a mano, en el tablero `laiacaliente-app`. Eso deja dos fuentes
@@ -191,18 +192,20 @@ Ojo con lo que dice la documentación y el código no tiene: `create --scheduled
 
 - Los contextos sin nadie mirando (cron, `-q`, webhook y API) rechazan los comandos peligrosos por defecto.
 - Los backends en contenedor se saltan esa revisión, porque el contenedor es el límite.
-- En Basecamp, `coder` y `qa` corren cada tarjeta en un contenedor desechable (1 CPU, 2.560 MB).
-  `orchestrator` y `publisher` corren en `local`, dentro del contenedor `hermes`, que tiene montado
-  `docker.sock`: eso equivale a root en el host.
+- En Basecamp, `coder` y `qa` corren cada tarjeta en un contenedor desechable de la misma imagen, como el
+  uid 1001 dueño de los clones, y **sin montar `/opt/data`**: ahí no hay ningún login de `gh`, así que una
+  tarjeta de coder compila, prueba y hace commit, pero no empuja. `orchestrator` y `publisher` corren en
+  `local`, dentro del contenedor `hermes`, que tiene montado `docker.sock`: eso equivale a root en el host.
 - Los logs repiten una advertencia: «API server is network-accessible (0.0.0.0) AND the terminal backend is
   'local'». Ahí falta verificar qué ve de verdad la red.
 
 ## 5. Cómo está hoy y qué roza
 
-Basecamp: Hermes `v0.21.6` sobre la imagen base `rc.4-v0.21.6`, y `factory v0.1.0` fijado con su `sha256`.
-Hay cinco perfiles (`default`, `orchestrator`, `coder`, `qa` y `publisher`), todos con `deepseek-v4.1-flash`,
-y no hay ningún job de cron. Los tableros: `factory-sandbox` (43 tarjetas hechas), `torresposso-site` (34) y
-`laiacaliente-app` (9 archivadas). Casi todas las corridas terminaron bien; solo dos se bloquearon.
+Basecamp: Hermes `v0.22.5` (`nousresearch/hermes-agent:v0.22.5@sha256:9c556157…`) y `factory v0.1.0` fijado
+con su `sha256`, los dos en el `Dockerfile`. Hay cinco perfiles (`default`, `orchestrator`, `coder`, `qa` y
+`publisher`), todos con `deepseek-v4.1-flash`, y no hay ningún job de cron. Los tableros: `factory-sandbox`
+(43 hechas y 14 archivadas), `torresposso-site` (34) y `laiacaliente-app` (9 archivadas). Casi todas las
+corridas terminaron bien; solo dos se bloquearon.
 
 | Qué roza | Efecto |
 |---|---|
@@ -217,9 +220,8 @@ y no hay ningún job de cron. Los tableros: `factory-sandbox` (43 tarjetas hecha
 
 ## 6. Qué haría, en orden
 
-1. **Actualizar Hermes a `v0.22.5`** en la imagen de Basecamp. La versión va fijada en el `Dockerfile`, con
-   la imagen oficial. Gana robustez sin romper la CLI que usa `factory`. Después se corre `factory plan
-   --dry-run` contra un tablero de prueba.
+1. ~~**Actualizar Hermes a `v0.22.5`** en la imagen de Basecamp~~. Hecho el 2026-10-24 con la imagen oficial
+   fijada por `sha256` en el `Dockerfile`. No rompió la CLI que usa `factory`.
 2. **Probar el hook `kanban_task_completed`** en `factory-sandbox`. Si funciona, la tarjeta Publish puede
    cambiarse por un hook que corra `factory publish`. Eso quita el paso que hoy depende de un modelo. Antes
    hay que corregir `docs/hermes.md`.
@@ -240,7 +242,9 @@ y no hay ningún job de cron. Los tableros: `factory-sandbox` (43 tarjetas hecha
 
 ## 7. Lo que sigue abierto
 
-- Si el gateway multiplexado lee `kanban.max_in_progress` del perfil `default` o de otro.
+- ~~Si el gateway multiplexado lee `kanban.max_in_progress` del perfil `default` o de otro.~~ Resuelto en
+  la práctica: los cinco `config.yaml` (la raíz y los cuatro perfiles) fijan `max_in_progress: 3`, así que
+  da igual cuál lea.
 - Hasta dónde llega `security.protected_instruction_files`, y si se puede abrir por tarjeta para los tickets
   que tienen que editar `AGENTS.md`.
 - Si un worker en un workspace `dir:` carga solo el `AGENTS.md` del repo. Se sabe que hace `chdir` al

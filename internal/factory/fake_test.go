@@ -76,9 +76,17 @@ type fakeGitHub struct {
 	blockers  map[int][]int
 	pulls     map[string][]PullRequest
 
-	opened    []NewPullRequest
-	openErr   error
-	issuesErr error
+	opened     []NewPullRequest
+	openErr    error
+	issuesErr  error
+	comments   []comment
+	commentErr error
+}
+
+// comment is one comment the factory added to an issue.
+type comment struct {
+	Issue int
+	Body  string
 }
 
 func (h *fakeGitHub) Issue(_ context.Context, number int) (Issue, error) {
@@ -122,6 +130,14 @@ func (h *fakeGitHub) OpenPullRequest(_ context.Context, pr NewPullRequest) (stri
 	}
 	h.opened = append(h.opened, pr)
 	return "https://github.com/torresposso/laiacaliente-app/pull/77", nil
+}
+
+func (h *fakeGitHub) Comment(_ context.Context, number int, body string) error {
+	if h.commentErr != nil {
+		return h.commentErr
+	}
+	h.comments = append(h.comments, comment{Issue: number, Body: body})
+	return nil
 }
 
 type fakeBoard struct {
