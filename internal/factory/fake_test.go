@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -85,7 +86,35 @@ type fakeGitHub struct {
 	commentErr error
 	statuses   []status
 	statusErr  error
+	assigned   []marked
+	labeled    []marked
+	loginErr   error
 }
+
+// marked is one assignment or label the factory added to an issue.
+type marked struct {
+	Issue int
+	Names string
+}
+
+func (h *fakeGitHub) Assign(_ context.Context, number int, logins []string) error {
+	h.assigned = append(h.assigned, marked{Issue: number, Names: strings.Join(logins, ",")})
+	return nil
+}
+
+func (h *fakeGitHub) Label(_ context.Context, number int, add, remove []string) error {
+	names := []string{}
+	for _, name := range add {
+		names = append(names, "+"+name)
+	}
+	for _, name := range remove {
+		names = append(names, "-"+name)
+	}
+	h.labeled = append(h.labeled, marked{Issue: number, Names: strings.Join(names, ",")})
+	return nil
+}
+
+func (h *fakeGitHub) Login(context.Context) (string, error) { return "torrespossobot", h.loginErr }
 
 // status is one move of an issue on its projects.
 type status struct {

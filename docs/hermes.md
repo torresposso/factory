@@ -90,6 +90,16 @@ and 0.22.5 is still the newest stable release.
 - A Note also moves the card's issue on every Project it is in whose `Status` has the option: to
   `In progress` when the card is claimed (a ticket's spec too), to `Blocked` when it blocks. In review
   and Done are the Project's own workflows, moved by the pull request's `Closes #`.
+- The labels follow the run, one state at a time, the way the Project's `Status` does: on claim the
+  issue and its spec get `factory` (which stays, so a search finds every issue the factory touched) and
+  `in-progress`, and lose `ready-for-agent` and `blocked`; on block the issue swaps `in-progress` for
+  `blocked`; when the pull request opens, the spec and every ticket it closes swap `in-progress` for
+  `in-review`. The merge closes them with their labels. Each change reads the issue's labels and puts the
+  whole set back (`PUT repos/<repo>/issues/<n>/labels`), because a `DELETE` of a label the issue lacks is
+  a 404. On claim it also assigns them to the login it acts as (`gh api user`); on block it assigns the
+  issue to the repository's owner, whose answer the card waits for. Assignees are only added. A label the
+  repository lacks is made by GitHub on the spot, grey (`#ededed`; tried on 2026-10-25), so the four are
+  created with colour and description in each repository beforehand.
 - The container needs `git`, `gh` and `hermes` on the `PATH`, plus `factory` itself for the hooks:
   all of them are in the image.
 

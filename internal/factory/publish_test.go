@@ -80,7 +80,7 @@ func TestPublishPushesAndOpensThePullRequest(t *testing.T) {
 		t.Fatalf("publish: %v", err)
 	}
 
-	want := []string{"publish-evidence", "push", "open-pull-request"}
+	want := []string{"publish-evidence", "push", "open-pull-request", "label", "label", "label"}
 	if got := actionsOf(plan); !equalStrings(got, want) {
 		t.Fatalf("steps = %v; want %v", got, want)
 	}
@@ -121,6 +121,23 @@ func TestPublishPushesAndOpensThePullRequest(t *testing.T) {
 	if h.factory.URL != "https://github.com/torresposso/laiacaliente-app/pull/77" {
 		t.Errorf("URL = %q", h.factory.URL)
 	}
+	// The spec and its tickets go from in progress to in review.
+	review := "+in-review,-in-progress"
+	if want := []marked{{20, review}, {21, review}, {22, review}}; !equalMarks(h.github.labeled, want) {
+		t.Errorf("labels = %+v; want %+v", h.github.labeled, want)
+	}
+}
+
+// pullRequestOf is the pull request a publish plan opens.
+func pullRequestOf(t *testing.T, plan *Plan) NewPullRequest {
+	t.Helper()
+	for _, step := range plan.Steps {
+		if pr, ok := step.(OpenPullRequestStep); ok {
+			return pr.PullRequest
+		}
+	}
+	t.Fatalf("the plan opens no pull request: %v", actionsOf(plan))
+	return NewPullRequest{}
 }
 
 // The pull request closes the spec and every ticket of it, and never closes the same
@@ -132,7 +149,7 @@ func TestPullRequestBodyClosesEveryTicketOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	body := plan.Steps[len(plan.Steps)-1].(OpenPullRequestStep).PullRequest.Body
+	body := pullRequestOf(t, plan).Body
 
 	for _, want := range []string{"Closes #20", "Closes #21", "Closes #22"} {
 		if !strings.Contains(body, want) {
@@ -155,7 +172,7 @@ func TestPullRequestBodySections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	body := plan.Steps[len(plan.Steps)-1].(OpenPullRequestStep).PullRequest.Body
+	body := pullRequestOf(t, plan).Body
 
 	for _, want := range []string{
 		"## Summary",
@@ -200,7 +217,7 @@ func TestEvidenceListsEveryShapeOfVerification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	body := plan.Steps[len(plan.Steps)-1].(OpenPullRequestStep).PullRequest.Body
+	body := pullRequestOf(t, plan).Body
 
 	for _, want := range []string{
 		"- #21: the list — commit 1111111a on `factory/20-21`\n  - make verify (exit 0)\n  - make preview at 390px: drawer opens\n",
@@ -239,10 +256,10 @@ func TestPublishOfALoneTicket(t *testing.T) {
 		t.Fatalf("publish: %v", err)
 	}
 
-	if got := actionsOf(plan); !equalStrings(got, []string{"push", "open-pull-request"}) {
+	if got := actionsOf(plan); !equalStrings(got, []string{"push", "open-pull-request", "label"}) {
 		t.Errorf("steps = %v; want no evidence step and no card step", got)
 	}
-	body := plan.Steps[1].(OpenPullRequestStep).PullRequest.Body
+	body := pullRequestOf(t, plan).Body
 	if strings.Count(body, "Closes #") != 1 {
 		t.Errorf("a lone ticket closes itself once:\n%s", body)
 	}
@@ -375,10 +392,10 @@ func TestPublishWithoutEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	if got := actionsOf(plan); !equalStrings(got, []string{"push", "open-pull-request"}) {
+	if got := actionsOf(plan); !equalStrings(got, []string{"push", "open-pull-request", "label", "label", "label"}) {
 		t.Errorf("steps = %v; want no evidence step", got)
 	}
-	body := plan.Steps[1].(OpenPullRequestStep).PullRequest.Body
+	body := pullRequestOf(t, plan).Body
 	if strings.Contains(body, "Screenshots,") {
 		t.Errorf("the body promises screenshots there are none of:\n%s", body)
 	}
@@ -398,7 +415,7 @@ func TestMergeDangerNamesTheRiskyPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	body := plan.Steps[len(plan.Steps)-1].(OpenPullRequestStep).PullRequest.Body
+	body := pullRequestOf(t, plan).Body
 
 	for _, want := range []string{
 		"4 file(s), +200/-10 against `main`.",

@@ -28,6 +28,18 @@ const (
 	projectBlocked    = "Blocked"
 )
 
+// The labels an issue carries through a run. factory stays, so a search finds every
+// issue the factory worked on; the other three follow the run, one at a time, and
+// say on the issue what its project's Status says. ready-for-agent is triage's, and
+// goes once an agent has the issue.
+const (
+	labelFactory      = "factory"
+	labelInProgress   = "in-progress"
+	labelBlocked      = "blocked"
+	labelInReview     = "in-review"
+	labelReadyToAgent = "ready-for-agent"
+)
+
 // Hook is what Hermes hands a shell hook on stdin when a card changes.
 type Hook struct {
 	Event string
@@ -176,33 +188,52 @@ func (f *Factory) readRunCard(ctx context.Context, id string) (cardOfRun, error)
 
 // Note is the comment a hook leaves on the card's issue: that the card started, why it
 // stopped, or what it did. The wording is the program's; what the worker reported is
-// quoted, never rewritten. A card that starts moves its issue, and the spec with it, to
-// In progress; one that stops moves its issue to Blocked. The comment goes first, so a
-// project that refuses the move still gets the word out.
+// quoted, never rewritten.
+//
+// A card that starts also marks its issue, and the spec with it: labelled factory and
+// in-progress, assigned to the factory's login, In progress on its projects. One that
+// stops is labelled blocked instead, assigned to the repository's owner, whose answer
+// it waits for, and moved to Blocked. The comment goes first, so an issue that refuses the rest still
+// gets the word out.
 func (f *Factory) Note(ctx context.Context, hook Hook) (*Plan, error) {
 	card, err := f.readRunCard(ctx, hook.Card)
 	if err != nil {
 		return nil, err
 	}
 	name := fmt.Sprintf("`%s` (%s)", card.Card.ID, card.Card.Title)
+	issues := []int{card.Issue}
+	if card.Run != card.Issue {
+		issues = append(issues, card.Run)
+	}
 	var body string
-	var moves []Step
+	var marks []Step
 	switch hook.Event {
 	case hookClaimed:
 		body = fmt.Sprintf("The factory is working on this: card %s started on board `%s`, run %d.", name, hook.Board, hook.Run)
-		moves = append(moves, StatusStep{Issue: card.Issue, Status: projectInProgress})
-		if card.Run != card.Issue {
-			moves = append(moves, StatusStep{Issue: card.Run, Status: projectInProgress})
+		login, err := f.GitHub.Login(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, issue := range issues {
+			marks = append(marks,
+				LabelStep{Issue: issue, Add: []string{labelFactory, labelInProgress}, Remove: []string{labelReadyToAgent, labelBlocked}},
+				AssignStep{Issue: issue, Logins: []string{login}},
+				StatusStep{Issue: issue, Status: projectInProgress},
+			)
 		}
 	case hookBlocked:
 		body = fmt.Sprintf("The factory's card %s is blocked and waits for an answer on board `%s`.", name, hook.Board) +
 			quoted(hook.Reason, "Its worker gave no reason.")
-		moves = append(moves, StatusStep{Issue: card.Issue, Status: projectBlocked})
+		marks = append(marks, LabelStep{Issue: card.Issue, Add: []string{labelBlocked}, Remove: []string{labelInProgress}})
+		if owner := f.owner(); owner != "" {
+			marks = append(marks, AssignStep{Issue: card.Issue, Logins: []string{owner}})
+		}
+		marks = append(marks, StatusStep{Issue: card.Issue, Status: projectBlocked})
 	case hookCompleted:
 		body = fmt.Sprintf("The factory's card %s is done.", name) +
 			quoted(hook.Summary, "Its worker reported no summary.")
 	}
-	return &Plan{Issue: card.Run, Steps: append([]Step{CommentStep{Issue: card.Issue, Body: body}}, moves...)}, nil
+	return &Plan{Issue: card.Run, Steps: append([]Step{CommentStep{Issue: card.Issue, Body: body}}, marks...)}, nil
 }
 
 // ReviewDone is the run a hook says is ready to publish: the run whose review card it

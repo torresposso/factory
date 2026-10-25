@@ -110,6 +110,10 @@ func (f *Factory) Publish(ctx context.Context, issue int) (*Plan, error) {
 			Reviewers: f.reviewers(),
 		}},
 	)
+	// The run is in review now, on the spec and every ticket the pull request closes.
+	for _, number := range runIssues(run) {
+		steps = append(steps, LabelStep{Issue: number, Add: []string{labelInReview}, Remove: []string{labelInProgress}})
+	}
 	return &Plan{Issue: issue, Steps: steps}, nil
 }
 
@@ -129,11 +133,28 @@ func pullRequestTitle(spec string) string {
 // merges it. The pull request comes from the factory's own login, so without the ask
 // nothing tells the owner it is waiting.
 func (f *Factory) reviewers() []string {
-	owner, _, ok := strings.Cut(f.Opts.Repo, "/")
-	if !ok || owner == "" {
-		return nil
+	if owner := f.owner(); owner != "" {
+		return []string{owner}
 	}
-	return []string{owner}
+	return nil
+}
+
+// owner is the repository's owner: who merges, and who answers a blocked card.
+func (f *Factory) owner() string {
+	owner, _, _ := strings.Cut(f.Opts.Repo, "/")
+	return owner
+}
+
+// runIssues are the issues a run's pull request closes: the spec, then its tickets.
+// A lone ticket is its own spec.
+func runIssues(run PlannedRun) []int {
+	issues := []int{run.Spec.Number}
+	for _, ticket := range run.Tickets {
+		if ticket.Issue.Number != run.Spec.Number {
+			issues = append(issues, ticket.Issue.Number)
+		}
+	}
+	return issues
 }
 
 // publishGate is the card whose `done` says the branch is ready to publish: the review

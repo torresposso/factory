@@ -198,6 +198,18 @@ type StatusStep struct {
 	Status string
 }
 
+// AssignStep adds logins to an issue's assignees.
+type AssignStep struct {
+	Issue  int
+	Logins []string
+}
+
+// LabelStep adds and removes labels on an issue: how its labels follow the run.
+type LabelStep struct {
+	Issue       int
+	Add, Remove []string
+}
+
 func (PullStep) String() string { return "update the base checkout (git pull --ff-only origin main)" }
 
 func (s AddWorktreeStep) String() string { return "worktree " + s.Branch + " at " + s.Path }
@@ -239,6 +251,21 @@ func (s CommentStep) String() string {
 
 func (s StatusStep) String() string {
 	return fmt.Sprintf("move #%d to %s on its projects", s.Issue, s.Status)
+}
+
+func (s AssignStep) String() string {
+	return fmt.Sprintf("assign #%d to %s", s.Issue, strings.Join(s.Logins, ", "))
+}
+
+func (s LabelStep) String() string {
+	line := fmt.Sprintf("label #%d", s.Issue)
+	if len(s.Add) > 0 {
+		line += " +" + strings.Join(s.Add, " +")
+	}
+	if len(s.Remove) > 0 {
+		line += " -" + strings.Join(s.Remove, " -")
+	}
+	return line
 }
 
 // Apply runs the plan, in order. The card ids a step needs are the ids of the cards the
@@ -302,6 +329,10 @@ func (f *Factory) applyStep(ctx context.Context, step Step) error {
 		return f.GitHub.Comment(ctx, s.Issue, s.Body)
 	case StatusStep:
 		return f.GitHub.SetStatus(ctx, s.Issue, s.Status)
+	case AssignStep:
+		return f.GitHub.Assign(ctx, s.Issue, s.Logins)
+	case LabelStep:
+		return f.GitHub.Label(ctx, s.Issue, s.Add, s.Remove)
 	default:
 		return fmt.Errorf("unknown step %T", step)
 	}
@@ -434,6 +465,10 @@ func actionOf(step Step) string {
 		return "comment"
 	case StatusStep:
 		return "set-status"
+	case AssignStep:
+		return "assign"
+	case LabelStep:
+		return "label"
 	default:
 		return "unknown"
 	}

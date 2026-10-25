@@ -359,3 +359,59 @@ func TestHookOptionsOfACardOnNoBoard(t *testing.T) {
 		t.Errorf("error = %v; want the board's own complaint", err)
 	}
 }
+
+// A card that starts labels its issue and the spec in progress and assigns them to the
+// factory's login; one that stops relabels its issue blocked and assigns it to the
+// owner, whose answer it waits for.
+func TestNoteMarksTheIssue(t *testing.T) {
+	const claimLabels = "+factory,+in-progress,-ready-for-agent,-blocked"
+	cases := []struct {
+		card, event      string
+		labeled, assigns []marked
+	}{
+		{"t_21", hookClaimed,
+			[]marked{{21, claimLabels}, {20, claimLabels}},
+			[]marked{{21, "torrespossobot"}, {20, "torrespossobot"}}},
+		{"t_review", hookClaimed, []marked{{20, claimLabels}}, []marked{{20, "torrespossobot"}}},
+		{"t_21", hookBlocked, []marked{{21, "+blocked,-in-progress"}}, []marked{{21, "torresposso"}}},
+		{"t_21", hookCompleted, nil, nil},
+	}
+	for _, c := range cases {
+		h := noteHarness(t)
+		plan, err := h.factory.Note(context.Background(), Hook{Event: c.event, Card: c.card, Board: "laiacaliente-app"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.factory.Apply(context.Background(), plan); err != nil {
+			t.Fatal(err)
+		}
+		if !equalMarks(h.github.labeled, c.labeled) {
+			t.Errorf("%s %s: labels = %+v; want %+v", c.card, c.event, h.github.labeled, c.labeled)
+		}
+		if !equalMarks(h.github.assigned, c.assigns) {
+			t.Errorf("%s %s: assignees = %+v; want %+v", c.card, c.event, h.github.assigned, c.assigns)
+		}
+	}
+}
+
+// Without the factory's login there is nobody to assign, and the note says so before
+// it comments anything.
+func TestNoteOfAStartWithoutTheLogin(t *testing.T) {
+	h := noteHarness(t)
+	h.github.loginErr = errors.New("gh: not logged in")
+	if _, err := h.factory.Note(context.Background(), Hook{Event: hookClaimed, Card: "t_21", Board: "laiacaliente-app"}); err == nil {
+		t.Error("no error without the login")
+	}
+}
+
+func equalMarks(got, want []marked) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}

@@ -294,6 +294,71 @@ func TestGitHubCommentsWithJSONOnStdin(t *testing.T) {
 	}
 }
 
+// Assignees are added, never replaced, as JSON on stdin.
+func TestGitHubAssignsWithJSONOnStdin(t *testing.T) {
+	tools := &recorder{}
+	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", Home: "/opt/data/profiles/publisher/home", commands: tools}
+	if err := hub.Assign(context.Background(), 21, []string{"torrespossobot"}); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"api", "-X", "POST", "repos/torresposso/laiacaliente-app/issues/21/assignees", "--input", "-"}
+	stdin := mustJSON(t, map[string][]string{"assignees": {"torrespossobot"}})
+	if got := tools.calls[0]; !equalStrings(got.Args, args) || got.Stdin != stdin {
+		t.Errorf("assign = %s < %s\nwant     gh %s < %s", command(got), got.Stdin, strings.Join(args, " "), stdin)
+	}
+}
+
+// Labels are read and put back as one set: the ones added join, the ones removed go
+// (matched without case, and no error when the issue lacks them), the rest stay.
+func TestGitHubRelabelsAsOneSet(t *testing.T) {
+	path := "repos/torresposso/laiacaliente-app/issues/21/labels"
+	tools := &recorder{replies: []reply{{
+		match: []string{"gh", "api", path},
+		out:   `[[{"name":"bug"},{"name":"Ready-For-Agent"}]]`,
+	}}}
+	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", commands: tools}
+	if err := hub.Label(context.Background(), 21, []string{"factory", "in-progress"}, []string{"ready-for-agent", "blocked"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(tools.calls) != 2 {
+		t.Fatalf("calls = %d; want a read and a write", len(tools.calls))
+	}
+	if got := tools.calls[0].Args; !equalStrings(got, []string{"api", path, "--paginate", "--slurp"}) {
+		t.Errorf("read = %v", got)
+	}
+	args := []string{"api", "-X", "PUT", path, "--input", "-"}
+	stdin := mustJSON(t, map[string][]string{"labels": {"bug", "factory", "in-progress"}})
+	if got := tools.calls[1]; !equalStrings(got.Args, args) || got.Stdin != stdin {
+		t.Errorf("write = %s < %s\nwant    gh %s < %s", command(got), got.Stdin, strings.Join(args, " "), stdin)
+	}
+}
+
+// Labels already as they should be are not written again.
+func TestGitHubLeavesLabelsThatNeedNoChange(t *testing.T) {
+	path := "repos/torresposso/laiacaliente-app/issues/21/labels"
+	tools := &recorder{replies: []reply{{match: []string{"gh", "api", path}, out: `[[{"name":"factory"},{"name":"in-progress"}]]`}}}
+	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", commands: tools}
+	if err := hub.Label(context.Background(), 21, []string{"In-Progress"}, []string{"blocked"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(tools.calls) != 1 {
+		t.Errorf("calls = %d; want only the read", len(tools.calls))
+	}
+}
+
+func TestGitHubReadsItsLogin(t *testing.T) {
+	tools := &recorder{replies: []reply{{match: []string{"gh", "api", "user"}, out: `{"login":"torrespossobot","id":149912249}`}}}
+	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", commands: tools}
+	if login, err := hub.Login(context.Background()); err != nil || login != "torrespossobot" {
+		t.Errorf("login = %q, %v", login, err)
+	}
+	tools = &recorder{replies: []reply{{match: []string{"gh", "api", "user"}, out: `{}`}}}
+	hub = &CLIGitHub{Repo: "torresposso/laiacaliente-app", commands: tools}
+	if _, err := hub.Login(context.Background()); err == nil {
+		t.Error("no error for an answer without a login")
+	}
+}
+
 // An issue is moved on every project whose Status has the option, matched without
 // regard to case, and left alone on a project without it.
 func TestGitHubSetsTheStatusOnEachProjectThatHasIt(t *testing.T) {

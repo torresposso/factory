@@ -36,6 +36,14 @@ type GitHub interface {
 	// SetStatus moves the issue to status on every project it is in whose Status field
 	// has that option. An issue in no such project is left alone.
 	SetStatus(ctx context.Context, number int, status string) error
+	// Assign adds logins to the issue's assignees, keeping the ones it has.
+	Assign(ctx context.Context, number int, logins []string) error
+	// Label adds and removes labels on the issue, keeping the rest. A label the
+	// repository does not have yet is made by GitHub; one the issue lacks is no
+	// error to remove.
+	Label(ctx context.Context, number int, add, remove []string) error
+	// Login is the login the factory acts as: whose name its comments carry.
+	Login(ctx context.Context) (string, error)
 }
 
 // PullRequest is the little the factory reads about one.
@@ -180,6 +188,97 @@ func (g *CLIGitHub) Comment(ctx context.Context, number int, body string) error 
 	return err
 }
 
+func (g *CLIGitHub) Assign(ctx context.Context, number int, logins []string) error {
+	_, err := g.send(ctx, fmt.Sprintf("repos/%s/issues/%d/assignees", g.Repo, number), map[string][]string{"assignees": logins})
+	return err
+}
+
+// Label reads the issue's labels and puts the whole set back changed: GitHub answers a
+// removal of a label the issue lacks with a 404, and one write says it all.
+func (g *CLIGitHub) Label(ctx context.Context, number int, add, remove []string) error {
+	path := fmt.Sprintf("repos/%s/issues/%d/labels", g.Repo, number)
+	out, err := g.api(ctx, path, "--paginate", "--slurp")
+	if err != nil {
+		return err
+	}
+	var pages [][]struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal([]byte(out), &pages); err != nil {
+		return fmt.Errorf("reading the labels of #%d: %w", number, err)
+	}
+	var had []string
+	for _, page := range pages {
+		for _, label := range page {
+			had = append(had, label.Name)
+		}
+	}
+	labels := relabel(had, add, remove)
+	if equalFoldSets(had, labels) {
+		return nil
+	}
+	_, err = g.write(ctx, "PUT", path, map[string][]string{"labels": labels})
+	return err
+}
+
+// relabel is had without remove and with add, in had's order and then add's. Names
+// match without case, as GitHub's do.
+func relabel(had, add, remove []string) []string {
+	labels := []string{}
+	keep := func(name string) {
+		for _, label := range labels {
+			if strings.EqualFold(label, name) {
+				return
+			}
+		}
+		labels = append(labels, name)
+	}
+	for _, name := range had {
+		if !containsFold(remove, name) {
+			keep(name)
+		}
+	}
+	for _, name := range add {
+		keep(name)
+	}
+	return labels
+}
+
+func containsFold(names []string, name string) bool {
+	for _, one := range names {
+		if strings.EqualFold(one, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func equalFoldSets(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, name := range a {
+		if !containsFold(b, name) {
+			return false
+		}
+	}
+	return true
+}
+
+func (g *CLIGitHub) Login(ctx context.Context) (string, error) {
+	out, err := g.api(ctx, "user")
+	if err != nil {
+		return "", err
+	}
+	var user struct {
+		Login string `json:"login"`
+	}
+	if err := json.Unmarshal([]byte(out), &user); err != nil || user.Login == "" {
+		return "", fmt.Errorf("GitHub's answer names no login: %s", strings.TrimSpace(out))
+	}
+	return user.Login, nil
+}
+
 // The issue's project items, each with its project's Status field, and the move of one.
 const (
 	projectItemsQuery = `query($owner: String!, $name: String!, $number: Int!) {
@@ -268,11 +367,16 @@ func (g *CLIGitHub) api(ctx context.Context, path string, extra ...string) (stri
 
 // send posts fields to the GitHub API as JSON on stdin.
 func (g *CLIGitHub) send(ctx context.Context, path string, fields any) (string, error) {
+	return g.write(ctx, "POST", path, fields)
+}
+
+// write sends fields to the GitHub API with method, as JSON on stdin.
+func (g *CLIGitHub) write(ctx context.Context, method, path string, fields any) (string, error) {
 	input, err := json.Marshal(fields)
 	if err != nil {
 		return "", err
 	}
-	return g.commands.run(ctx, g.env(), string(input), "gh", "api", "-X", "POST", path, "--input", "-")
+	return g.commands.run(ctx, g.env(), string(input), "gh", "api", "-X", method, path, "--input", "-")
 }
 
 // graphQL runs one query or mutation. `gh api graphql` exits non-zero when GitHub
