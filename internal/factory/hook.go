@@ -162,6 +162,7 @@ type cardOfRun struct {
 	// spec for the integration and the review.
 	Run, Issue int
 	Review     bool
+	Detail     BoardCardDetail
 }
 
 // readRunCard reads a card back as one of a run's. Its workspace says which run, and
@@ -178,10 +179,10 @@ func (f *Factory) readRunCard(ctx context.Context, id string) (cardOfRun, error)
 	}
 	if match := ticketTitle.FindStringSubmatch(card.Title); match != nil {
 		ticket, _ := strconv.Atoi(match[1])
-		return cardOfRun{Card: card, Run: run, Issue: ticket}, nil
+		return cardOfRun{Card: card, Run: run, Issue: ticket, Detail: detail}, nil
 	}
 	if match := runTitle.FindStringSubmatch(card.Title); match != nil && match[2] == strconv.Itoa(run) {
-		return cardOfRun{Card: card, Run: run, Issue: run, Review: match[1] == "Review"}, nil
+		return cardOfRun{Card: card, Run: run, Issue: run, Review: match[1] == "Review", Detail: detail}, nil
 	}
 	return cardOfRun{}, fmt.Errorf("%w: %s (%s) is not a title the plan writes", ErrNotARunCard, id, card.Title)
 }
@@ -193,7 +194,9 @@ func (f *Factory) readRunCard(ctx context.Context, id string) (cardOfRun, error)
 // A card that starts also marks its issue, and the spec with it: labelled factory and
 // in-progress, assigned to the factory's login, In progress on its projects. One that
 // stops is labelled blocked instead, assigned to the repository's owner, whose answer
-// it waits for, and moved to Blocked. The comment goes first, so an issue that refuses the rest still
+// it waits for, and moved to Blocked. A card that stops or ends also carries what its
+// worker wrote on the card during that run: Hermes calls no hook on a comment
+// (0.22.5), so this is the first moment the issue can have it. The comment goes first, so an issue that refuses the rest still
 // gets the word out.
 func (f *Factory) Note(ctx context.Context, hook Hook) (*Plan, error) {
 	card, err := f.readRunCard(ctx, hook.Card)
@@ -223,7 +226,7 @@ func (f *Factory) Note(ctx context.Context, hook Hook) (*Plan, error) {
 		}
 	case hookBlocked:
 		body = fmt.Sprintf("The factory's card %s is blocked and waits for an answer on board `%s`.", name, hook.Board) +
-			quoted(hook.Reason, "Its worker gave no reason.")
+			quoted(hook.Reason, "Its worker gave no reason.") + cardComments(card.Detail, hook.Run)
 		marks = append(marks, LabelStep{Issue: card.Issue, Add: []string{labelBlocked}, Remove: []string{labelInProgress}})
 		if owner := f.owner(); owner != "" {
 			marks = append(marks, AssignStep{Issue: card.Issue, Logins: []string{owner}})
@@ -231,7 +234,7 @@ func (f *Factory) Note(ctx context.Context, hook Hook) (*Plan, error) {
 		marks = append(marks, StatusStep{Issue: card.Issue, Status: projectBlocked})
 	case hookCompleted:
 		body = fmt.Sprintf("The factory's card %s is done.", name) +
-			quoted(hook.Summary, "Its worker reported no summary.")
+			quoted(hook.Summary, "Its worker reported no summary.") + cardComments(card.Detail, hook.Run)
 	}
 	return &Plan{Issue: card.Run, Steps: append([]Step{CommentStep{Issue: card.Issue, Body: body}}, marks...)}, nil
 }
@@ -304,6 +307,32 @@ func (f *Factory) PublishAndNote(ctx context.Context, issue int) error {
 
 // quoted is a worker's words as a Markdown quote under the program's line, or what to
 // say when it left none.
+// maxCommentsLength keeps a note under GitHub's 65536 characters for a comment's body.
+const maxCommentsLength = 60000
+
+// cardComments are the comments written on the card since the run started, each quoted
+// under its author. A run the card does not list counts from its first comment, and a
+// card nobody commented on adds nothing.
+func cardComments(detail BoardCardDetail, run int) string {
+	var since int64
+	for _, attempt := range detail.Runs {
+		if attempt.ID == run {
+			since = attempt.StartedAt
+		}
+	}
+	var text string
+	for _, c := range detail.Comments {
+		if c.CreatedAt < since || strings.TrimSpace(c.Body) == "" {
+			continue
+		}
+		text += fmt.Sprintf("\n\n**%s** wrote on the card:", c.Author) + quoted(c.Body, "")
+	}
+	if len(text) > maxCommentsLength {
+		text = strings.ToValidUTF8(text[:maxCommentsLength], "") + "\n\n_The rest is on the card._"
+	}
+	return text
+}
+
 func quoted(text, none string) string {
 	text = strings.TrimSpace(text)
 	if text == "" {

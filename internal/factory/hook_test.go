@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // payload is a hook's stdin, as Hermes wrote it on Basecamp (docs/hermes.md).
@@ -414,4 +415,50 @@ func equalMarks(got, want []marked) bool {
 		}
 	}
 	return true
+}
+
+// A card that ends carries what its worker wrote on the card in that run, quoted under
+// its author; the comments of an earlier attempt stay on the card.
+func TestNoteCarriesTheRunsComments(t *testing.T) {
+	for _, event := range []string{hookCompleted, hookBlocked} {
+		h := noteHarness(t)
+		detail := h.board.details["t_21"]
+		detail.Runs = []CardRun{{ID: 1, StartedAt: 100}, {ID: 2, StartedAt: 200}}
+		detail.Comments = []CardComment{
+			{Author: "coder", Body: "First try: the build broke.", CreatedAt: 150},
+			{Author: "coder", Body: "## Findings\n\nThe list pages by 50.", CreatedAt: 250},
+		}
+		h.board.details["t_21"] = detail
+
+		got := h.note(t, Hook{Event: event, Card: "t_21", Board: "laiacaliente-app", Run: 2, Summary: "Done.", Reason: "Which order?"})
+		if want := "**coder** wrote on the card:\n\n> ## Findings\n>\n> The list pages by 50."; !strings.Contains(got.Body, want) {
+			t.Errorf("%s: the note does not quote the run's comment:\n%s", event, got.Body)
+		}
+		if strings.Contains(got.Body, "First try") {
+			t.Errorf("%s: the note quotes an earlier attempt's comment:\n%s", event, got.Body)
+		}
+	}
+}
+
+// A card nobody commented on, or a start, adds no comment section.
+func TestNoteWithoutCommentsAddsNothing(t *testing.T) {
+	h := noteHarness(t)
+	if got := h.note(t, Hook{Event: hookCompleted, Card: "t_21", Board: "laiacaliente-app", Run: 2}); strings.Contains(got.Body, "wrote on the card") {
+		t.Errorf("note = %s", got.Body)
+	}
+	h = noteHarness(t)
+	detail := h.board.details["t_21"]
+	detail.Comments = []CardComment{{Author: "coder", Body: "Starting.", CreatedAt: 1}}
+	h.board.details["t_21"] = detail
+	if got := h.note(t, Hook{Event: hookClaimed, Card: "t_21", Board: "laiacaliente-app", Run: 2}); strings.Contains(got.Body, "Starting.") {
+		t.Errorf("a start quotes comments: %s", got.Body)
+	}
+}
+
+// Comments longer than GitHub takes are cut, and the note says where the rest is.
+func TestNoteCutsLongComments(t *testing.T) {
+	text := cardComments(BoardCardDetail{Comments: []CardComment{{Author: "qa", Body: strings.Repeat("ñ", maxCommentsLength)}}}, 0)
+	if len(text) > maxCommentsLength+100 || !strings.HasSuffix(text, "_The rest is on the card._") || !utf8.ValidString(text) {
+		t.Errorf("cut to %d bytes, ending %q", len(text), text[len(text)-40:])
+	}
 }

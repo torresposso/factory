@@ -71,15 +71,27 @@ type BoardCardDetail struct {
 	Parents []string `json:"parents"`
 	// Summary is what the card's last worker said it did.
 	Summary string `json:"latest_summary"`
+	// Comments are what was written on the card, oldest first, and Runs its attempts.
+	Comments []CardComment `json:"comments"`
+	Runs     []CardRun     `json:"runs"`
+}
+
+// CardComment is one comment on a card: a worker's note on its progress or findings.
+type CardComment struct {
+	Author    string `json:"author"`
+	Body      string `json:"body"`
+	CreatedAt int64  `json:"created_at"`
 }
 
 // CardRun is one run of a card.
 type CardRun struct {
-	Profile  string          `json:"profile"`
-	Status   string          `json:"status"`
-	Outcome  string          `json:"outcome"`
-	Summary  string          `json:"summary"`
-	Metadata json.RawMessage `json:"metadata"`
+	ID        int             `json:"id"`
+	StartedAt int64           `json:"started_at"`
+	Profile   string          `json:"profile"`
+	Status    string          `json:"status"`
+	Outcome   string          `json:"outcome"`
+	Summary   string          `json:"summary"`
+	Metadata  json.RawMessage `json:"metadata"`
 }
 
 // Keys are the metadata keys a card's worker is asked to report.

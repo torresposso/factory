@@ -59,6 +59,11 @@ and 0.22.5 is still the newest stable release.
   mutate Kanban tasks or boards"). `hermes kanban list` is one of them — it promotes ready cards before it
   lists — while `show` and `runs` only read. `factory publish --hook` reads the run from the review card up
   through its parents with `show` for that reason (seen on 2026-10-25, when the first publish failed on `list`).
+- A comment on a card (`kanban_comment`, `hermes kanban comment`) calls no hook at all: `add_comment` only
+  appends a `commented` event (read in `hermes_cli/kanban_db.py` of 0.22.5), and `on_kanban_task_updated`
+  is a plugin hook for other writes. `show --json` lists them under `comments` (`author`, `body`,
+  `created_at`) and the attempts under `runs` (`id`, `started_at`), so a blocked or completed Note quotes the
+  comments of that run on the issue — the soonest the issue can see them.
 - The dispatcher is not a service of its own: it lives inside the gateway that owns the board. On Basecamp
   `kanban.dispatch_interval_seconds` is 10, `review_dispatch` is on, and `max_in_progress` is 3 in the root
   `config.yaml` and in all four profiles, so it does not matter which one the gateway reads.
