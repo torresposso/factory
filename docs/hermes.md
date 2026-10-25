@@ -83,6 +83,10 @@ and 0.22.5 is still the newest stable release.
   (`graphql`) send JSON on stdin with `--input -`. Since 2026-10-25 that login is the machine account
   `torrespossobot`, with write on the repositories and on the Project, and the `project` scope; the
   owner's login stays beside it, inactive (`gh auth switch` brings it back).
+- The pull request comes from that machine account, so GitHub tells the owner nothing on its own: once it
+  is open, `publish` asks the repository's owner for a review (`POST repos/<repo>/pulls/<n>/requested_reviewers`),
+  which notifies them and puts it in their review queue. The author is never asked — GitHub refuses that.
+  Its title is the spec's without the trailing `(spec)`.
 - A Note also moves the card's issue on every Project it is in whose `Status` has the option: to
   `In progress` when the card is claimed (a ticket's spec too), to `Blocked` when it blocks. In review
   and Done are the Project's own workflows, moved by the pull request's `Closes #`.

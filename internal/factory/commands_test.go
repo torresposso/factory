@@ -3,6 +3,7 @@ package factory
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -205,6 +206,62 @@ func TestGitHubOpensThePullRequestWithJSONOnStdin(t *testing.T) {
 	}
 	if url != "https://github.com/torresposso/laiacaliente-app/pull/77" {
 		t.Errorf("url = %q", url)
+	}
+}
+
+// The review is asked for once the pull request exists, of everyone but its author:
+// GitHub refuses to ask the author.
+func TestGitHubAsksForTheReviewOfAllButTheAuthor(t *testing.T) {
+	tools := &recorder{replies: []reply{{
+		match: []string{"gh", "api", "-X", "POST", "repos/torresposso/laiacaliente-app/pulls", "--input"},
+		out:   `{"number":77,"html_url":"https://github.com/torresposso/laiacaliente-app/pull/77","user":{"login":"torrespossobot"}}`,
+	}}}
+	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", commands: tools}
+
+	url, err := hub.OpenPullRequest(context.Background(), NewPullRequest{
+		Base: "main", Head: "factory/20", Title: "Portfolio", Reviewers: []string{"torresposso", "TorresPossoBot"},
+	})
+	if err != nil || url != "https://github.com/torresposso/laiacaliente-app/pull/77" {
+		t.Fatalf("open = %q, %v", url, err)
+	}
+	if len(tools.calls) != 2 {
+		t.Fatalf("calls = %d; want the pull request and the review", len(tools.calls))
+	}
+	want := []string{"api", "-X", "POST", "repos/torresposso/laiacaliente-app/pulls/77/requested_reviewers", "--input", "-"}
+	if got := tools.calls[1]; !equalStrings(got.Args, want) {
+		t.Errorf("review = %s\nwant     gh %s", command(got), strings.Join(want, " "))
+	}
+	if got := tools.calls[1].Stdin; got != mustJSON(t, map[string][]string{"reviewers": {"torresposso"}}) {
+		t.Errorf("stdin = %s", got)
+	}
+}
+
+// A pull request opened by its only reviewer asks nobody.
+func TestGitHubAsksNoReviewOfTheAuthorAlone(t *testing.T) {
+	tools := &recorder{replies: []reply{{
+		match: []string{"gh", "api"},
+		out:   `{"number":77,"html_url":"https://github.com/torresposso/laiacaliente-app/pull/77","user":{"login":"torresposso"}}`,
+	}}}
+	hub := &CLIGitHub{Repo: "torresposso/laiacaliente-app", commands: tools}
+	if _, err := hub.OpenPullRequest(context.Background(), NewPullRequest{Reviewers: []string{"torresposso"}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(tools.calls) != 1 {
+		t.Errorf("calls = %d; want only the pull request", len(tools.calls))
+	}
+}
+
+// A review that cannot be asked for fails the step, but the address is still reported:
+// the pull request is open.
+func TestAReviewThatFailsStillReportsThePullRequest(t *testing.T) {
+	h := newHarness(t)
+	h.github.openURLErr = errors.New("asking for a review failed")
+	plan := &Plan{Issue: 20, Steps: []Step{OpenPullRequestStep{PullRequest: NewPullRequest{Base: "main", Head: "factory/20"}}}}
+	if err := h.factory.Apply(context.Background(), plan); err == nil {
+		t.Error("no error for a review that failed")
+	}
+	if h.factory.URL != "https://github.com/torresposso/laiacaliente-app/pull/77" {
+		t.Errorf("url = %q; want the pull request that opened", h.factory.URL)
 	}
 }
 

@@ -76,8 +76,10 @@ type fakeGitHub struct {
 	blockers  map[int][]int
 	pulls     map[string][]PullRequest
 
-	opened     []NewPullRequest
-	openErr    error
+	opened  []NewPullRequest
+	openErr error
+	// openURLErr is an error after the pull request opened: its review failed.
+	openURLErr error
 	issuesErr  error
 	comments   []comment
 	commentErr error
@@ -145,7 +147,7 @@ func (h *fakeGitHub) OpenPullRequest(_ context.Context, pr NewPullRequest) (stri
 		return "", h.openErr
 	}
 	h.opened = append(h.opened, pr)
-	return "https://github.com/torresposso/laiacaliente-app/pull/77", nil
+	return "https://github.com/torresposso/laiacaliente-app/pull/77", h.openURLErr
 }
 
 func (h *fakeGitHub) Comment(_ context.Context, number int, body string) error {

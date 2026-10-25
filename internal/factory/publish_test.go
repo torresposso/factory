@@ -102,6 +102,9 @@ func TestPublishPushesAndOpensThePullRequest(t *testing.T) {
 	if pr.PullRequest.Title != "Portfolio" {
 		t.Errorf("title = %q", pr.PullRequest.Title)
 	}
+	if !equalStrings(pr.PullRequest.Reviewers, []string{"torresposso"}) {
+		t.Errorf("reviewers = %v; want the repository's owner, who merges", pr.PullRequest.Reviewers)
+	}
 
 	if err := h.factory.Apply(context.Background(), plan); err != nil {
 		t.Fatalf("apply: %v", err)
@@ -513,5 +516,20 @@ func TestReportOfAPublishCarriesTheBody(t *testing.T) {
 	}
 	if report.PullRequest.Head != "factory/20" || !strings.Contains(report.PullRequest.Body, "## Evidence") {
 		t.Errorf("report = %+v", report.PullRequest)
+	}
+}
+
+// A spec's title says it is a spec; the pull request's does not.
+func TestPullRequestTitleDropsTheSpecMark(t *testing.T) {
+	for spec, want := range map[string]string{
+		"The footer links to the Acerca page (spec)": "The footer links to the Acerca page",
+		"Portfolio (Spec) ":                          "Portfolio",
+		"Portfolio":                                  "Portfolio",
+		"(spec) the first word":                      "(spec) the first word",
+		"(spec)":                                     "(spec)",
+	} {
+		if got := pullRequestTitle(spec); got != want {
+			t.Errorf("pullRequestTitle(%q) = %q; want %q", spec, got, want)
+		}
 	}
 }

@@ -27,7 +27,9 @@ type GitHub interface {
 	// PullRequests reads the pull requests whose head is branch, newest first, in the
 	// given state: open, closed or all.
 	PullRequests(ctx context.Context, branch, state string) ([]PullRequest, error)
-	// OpenPullRequest opens a pull request and returns its address.
+	// OpenPullRequest opens a pull request, asks its reviewers for a review, and returns
+	// its address. A pull request that opened but whose review could not be asked for
+	// still returns its address, beside the error.
 	OpenPullRequest(ctx context.Context, pr NewPullRequest) (string, error)
 	// Comment adds a comment to an issue: how the tickets say what the run is doing.
 	Comment(ctx context.Context, number int, body string) error
@@ -50,6 +52,9 @@ type NewPullRequest struct {
 	Head  string
 	Title string
 	Body  string
+	// Reviewers are the logins asked for a review. The author is left out: GitHub
+	// refuses to ask a pull request's author to review it.
+	Reviewers []string
 }
 
 // CLIGitHub talks to GitHub through `gh api`, reads and writes alike: what it prints is
@@ -145,10 +150,27 @@ func (g *CLIGitHub) OpenPullRequest(ctx context.Context, pr NewPullRequest) (str
 		return "", err
 	}
 	var opened struct {
+		Number  int    `json:"number"`
 		HTMLURL string `json:"html_url"`
+		User    struct {
+			Login string `json:"login"`
+		} `json:"user"`
 	}
 	if err := json.Unmarshal([]byte(out), &opened); err != nil || opened.HTMLURL == "" {
 		return "", fmt.Errorf("GitHub's answer to the new pull request names no address: %s", strings.TrimSpace(out))
+	}
+	var reviewers []string
+	for _, login := range pr.Reviewers {
+		if !strings.EqualFold(login, opened.User.Login) {
+			reviewers = append(reviewers, login)
+		}
+	}
+	if len(reviewers) > 0 {
+		path := fmt.Sprintf("repos/%s/pulls/%d/requested_reviewers", g.Repo, opened.Number)
+		if _, err := g.send(ctx, path, map[string][]string{"reviewers": reviewers}); err != nil {
+			return opened.HTMLURL, fmt.Errorf("opened %s, but asking %s for a review failed: %w",
+				opened.HTMLURL, strings.Join(reviewers, ", "), err)
+		}
 	}
 	return opened.HTMLURL, nil
 }

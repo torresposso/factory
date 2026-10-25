@@ -225,7 +225,11 @@ func (s PublishEvidenceStep) String() string {
 }
 
 func (s OpenPullRequestStep) String() string {
-	return fmt.Sprintf("open the pull request %s -> %s", s.PullRequest.Head, s.PullRequest.Base)
+	line := fmt.Sprintf("open the pull request %s -> %s", s.PullRequest.Head, s.PullRequest.Base)
+	if len(s.PullRequest.Reviewers) > 0 {
+		line += ", review asked of " + strings.Join(s.PullRequest.Reviewers, ", ")
+	}
+	return line
 }
 
 func (s CommentStep) String() string {
@@ -290,11 +294,10 @@ func (f *Factory) applyStep(ctx context.Context, step Step) error {
 		return f.Git.PublishEvidence(ctx, s.Ref, files)
 	case OpenPullRequestStep:
 		url, err := f.GitHub.OpenPullRequest(ctx, s.PullRequest)
-		if err != nil {
-			return err
+		if url != "" {
+			f.URL = url
 		}
-		f.URL = url
-		return nil
+		return err
 	case CommentStep:
 		return f.GitHub.Comment(ctx, s.Issue, s.Body)
 	case StatusStep:
@@ -341,10 +344,11 @@ type WorktreeReport struct {
 // PullRequestReport is the pull request a publish opens, body and all: `--dry-run`
 // prints it, which is how the body is read before it exists anywhere.
 type PullRequestReport struct {
-	Base  string `json:"base"`
-	Head  string `json:"head"`
-	Title string `json:"title"`
-	Body  string `json:"body"`
+	Base      string   `json:"base"`
+	Head      string   `json:"head"`
+	Title     string   `json:"title"`
+	Body      string   `json:"body"`
+	Reviewers []string `json:"reviewers,omitempty"`
 }
 
 // CardReport is one card the plan creates, with the body it will carry.
@@ -376,10 +380,11 @@ func NewReport(plan *Plan, board string, dryRun bool) Report {
 			report.Worktrees = append(report.Worktrees, WorktreeReport{Branch: s.Branch, Path: s.Path})
 		case OpenPullRequestStep:
 			report.PullRequest = &PullRequestReport{
-				Base:  s.PullRequest.Base,
-				Head:  s.PullRequest.Head,
-				Title: s.PullRequest.Title,
-				Body:  s.PullRequest.Body,
+				Base:      s.PullRequest.Base,
+				Head:      s.PullRequest.Head,
+				Title:     s.PullRequest.Title,
+				Body:      s.PullRequest.Body,
+				Reviewers: s.PullRequest.Reviewers,
 			}
 		case CommentStep:
 			report.Comments = append(report.Comments, CommentReport{Issue: s.Issue, Body: s.Body})

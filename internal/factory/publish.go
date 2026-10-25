@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -102,13 +103,37 @@ func (f *Factory) Publish(ctx context.Context, issue int) (*Plan, error) {
 	steps = append(steps,
 		PushStep{Branch: branch(issue)},
 		OpenPullRequestStep{PullRequest: NewPullRequest{
-			Base:  "main",
-			Head:  branch(issue),
-			Title: run.Spec.Title,
-			Body:  f.pullRequestBody(run, reported, images, gate, diff),
+			Base:      "main",
+			Head:      branch(issue),
+			Title:     pullRequestTitle(run.Spec.Title),
+			Body:      f.pullRequestBody(run, reported, images, gate, diff),
+			Reviewers: f.reviewers(),
 		}},
 	)
 	return &Plan{Issue: issue, Steps: steps}, nil
+}
+
+// specMark is how a spec's title says it is a spec. It tells the issues apart; on the
+// pull request, which is the change itself, it says nothing.
+var specMark = regexp.MustCompile(`(?i)\s*\(spec\)\s*$`)
+
+// pullRequestTitle is the spec's title without its mark.
+func pullRequestTitle(spec string) string {
+	if title := specMark.ReplaceAllString(spec, ""); title != "" {
+		return title
+	}
+	return spec
+}
+
+// reviewers are who the pull request asks for a review: the repository's owner, who
+// merges it. The pull request comes from the factory's own login, so without the ask
+// nothing tells the owner it is waiting.
+func (f *Factory) reviewers() []string {
+	owner, _, ok := strings.Cut(f.Opts.Repo, "/")
+	if !ok || owner == "" {
+		return nil
+	}
+	return []string{owner}
 }
 
 // publishGate is the card whose `done` says the branch is ready to publish: the review
