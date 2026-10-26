@@ -99,9 +99,29 @@ and 0.22.5 is still the newest stable release.
   mounted cache (`~/.cache/factory-go/opencode/config/opencode/`), adds that path under `skills` and sets the
   model. 23 of those skills set `disable-model-invocation`, so OpenCode does not list them — `implement`,
   `implement-spec`, `to-spec`, `to-tickets` and `retro` among them — and a card loads them by name; `tdd` and
-  `code-review` are listed. In a card, `opencode run` starts a background server inside the card's own
-  container (port 49374) and every later call is a client of it: the server survived the card's exec calls on
-  2026-10-26. `--standalone` is the opposite — a private server per call, no session carried over.
+  `code-review` are listed. A card calls `opencode run --standalone`: a private server per call, on no
+  fixed port, and `-c` still continues the session the previous call left in that workspace (probed in a
+  card on 2026-10-26, second call from its own exec, which answered with the first one's words). Without
+  the flag the first call starts a server on 49374 and the later ones are its clients — which dies with
+  `Managed service port 49374 already in use` when anything else holds that port. The ticket goes in on
+  stdin: argv is wrapped in quotes and re-escaped, so `"$(cat ticket.md)"` arrived 25 characters longer
+  and with its quotes altered that day, while stdin arrived byte for byte.
+- A foreground terminal command has five minutes. `terminal.lifetime_seconds` is 300 and
+  `_cleanup_inactive_envs` recycles any sandbox that has no background process of its own, so a command
+  still running at 300 s gets its container stopped and returns `exit 137`
+  (`Cleaned up inactive environment for task`, 2026-10-26, after 323 s, which killed a card's implement
+  run). Long work runs with `background=true` and its output in a file: the reaper refreshes the
+  sandbox's activity while that process lives, and the file is where the card reads its transcript.
+- The agent's own browser tools are off in a card, and turning them on would not help: the image runs
+  Hermes in its default *browser-use* mode, where `browser_*` are disabled on purpose, and they run in
+  the main container, where a card's preview — a port inside the card's own sandbox — does not exist.
+  Cards look with `chrome-devtools-axi` inside their sandbox: `run` with a script (`page.open`,
+  `page.fill`, `page.click`, `page.eval`) prints what it finds, and `screenshot` saves the image;
+  selectors survive a page change, a snapshot's `@refs` do not.
+- The dashboard shows a running card as `Session: local-…` and nothing else. The transcript is in the
+  profile's state database: `/opt/data/profiles/<profile>/state.db`, table `messages`, one row per turn
+  with its `tool_name` and `tool_calls`. Read it with `sqlite3` in read-only mode; the card's own log
+  file under `/opt/data/kanban/boards/<board>/logs/` holds only that session line.
 - Two cards on factory-sandbox did the same ticket on 2026-10-26: the first, told to call OpenCode with
   `--standalone` and no skills, took 271 s and 13 changed lines with a test that only looked for the text;
   the flow's card loaded `implement`, ran `tdd`, and its `code-review` subagents pushed it to assert the

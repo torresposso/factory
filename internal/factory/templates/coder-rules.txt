@@ -9,12 +9,19 @@
 - Read AGENTS.md first and follow it. Do only your ticket: do not tidy, rename or reformat code your
   ticket does not need, because another card is editing the same files and every extra line you touch
   is a conflict later.
-- Write the code through OpenCode, not yourself: from your workspace,
-  `opencode run "<your ticket, and: read AGENTS.md first, load the implement skill, use tdd at the
-  repo's seams, run make verify, do not commit; if the ticket is unclear, do not ask, stop and say what
-  is unclear>"`. Leave out `--standalone`: the first call starts the card's own server and the later
-  ones are its clients. Then read its diff and run `make verify` yourself, and fix what it gets wrong
-  with another call that says what to fix.
+- Write the code through OpenCode, not yourself. Write the ticket to `tmp/ticket-{{.Ticket}}.md` with
+  write_file: the ticket text, then, in your own words, read AGENTS.md first, load the implement skill,
+  use tdd at the repo's seams, run make verify, do not commit; if the ticket is unclear, do not ask,
+  stop and say what is unclear. Then run it from your workspace, in the background:
+
+      opencode run --standalone --title "ticket {{.Ticket}}" < tmp/ticket-{{.Ticket}}.md > tmp/opencode-{{.Ticket}}.out 2> tmp/opencode-{{.Ticket}}.log
+
+  with `background=true`. The ticket goes in on stdin, byte for byte, so no quoting mangles it, and
+  `--standalone` gives the call its own server, so no other card's port is in the way. `.out` takes its
+  final message and the exit code; `.log` is the transcript as it happens, so `tail` and `wc -c` tell
+  you how far along it is. Then read its diff and run `make verify` yourself, and fix what it gets wrong
+  with another call that says what to fix: `opencode run --standalone -c "<what to fix>"` continues the
+  session you just had, in this workspace.
 - The implement skill says to ask when the ticket is ambiguous and to commit at the end. Here nobody
   answers and the commit is yours: when OpenCode stops on something unclear, call kanban_block with
   kind "needs_input" and its question; when it says it committed, check `git log` and leave its commit
@@ -26,10 +33,22 @@
   holds; if it does, your role says what to do.
 - Run `make verify` from the repo root. Only when it exits 0, commit, and end the commit message with
   `Refs #{{.Ticket}}` for your ticket.
-- A change to a page is not done until you have looked at it: follow "See it" in AGENTS.md, but serve
-  the preview on your `Preview port` instead of the port AGENTS.md names —
-  `make preview PORT=<your port> DIR=tmp/preview-{{.Ticket}}`. Stop it before you finish with
-  `make preview-stop DIR=tmp/preview-{{.Ticket}}`, never with `pkill`.
+- A change to a page is not done until you have looked at it: serve the preview on your `Preview port`
+  instead of the port AGENTS.md names — `make preview PORT=<your port> DIR=tmp/preview-{{.Ticket}}`,
+  in the background — and stop it before you finish with
+  `make preview-stop DIR=tmp/preview-{{.Ticket}}`, never with `pkill`. The agent's own browser is not
+  reachable from a card and cannot see the preview anyway; look with the tool that is there, which
+  needs no setup:
+
+      chrome-devtools-axi run < tmp/look.js
+      chrome-devtools-axi screenshot tmp/evidence/{{.Ticket}}-what.png
+      chrome-devtools-axi stop
+
+  `tmp/look.js` is a few lines of `await page.open("http://127.0.0.1:<your port>/...")`,
+  `await page.fill("<css selector>", "...")`, `await page.click("<css selector>")` and
+  `await page.eval(() => document.body.innerText)`, and `run` prints what they return. Selectors work;
+  a snapshot's `@refs` go stale the moment the page changes, so ask for the text and the numbers and
+  keep the image for one narrow visual question.
 - Save the screenshots that show the change (at most 3, PNG) in `tmp/evidence/` of your workspace,
   named `{{.Ticket}}-what.png`. That folder is not committed. If a preview data directory you want
   already exists, use another name instead of removing it.
@@ -40,8 +59,12 @@
   have no GitHub access and need none.
 - Nobody is there to approve anything, and Hermes refuses whatever asks for approval. Never edit
   AGENTS.md, CLAUDE.md or any other agent-instruction file: if your ticket seems to need a change there,
-  say so in your summary. Run commands directly, never through `bash -c`, `sh -c`, `python -c`, a
-  heredoc or `rm -r`: Hermes blocks them.
+  say so in your summary. Keep each command one plain command: write a file with write_file and commit
+  it with `git commit -F <file>` rather than wrapping it in `bash -c`, `sh -c`, `python -c` or a
+  heredoc, delete nothing recursively (temp files go away with the container), and start anything long
+  with `background=true` instead of a trailing `&`. A command that runs past five minutes in the
+  foreground loses its container at five minutes and comes back as exit 137: put it in the background
+  with its output in a file and read the file.
 - Finish with kanban_complete: a short summary that says what you changed and in which files, and
   metadata with the keys verification (a list: each command you ran and its result), branch, commit
   (the sha) and changed_files.

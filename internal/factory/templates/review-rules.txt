@@ -3,9 +3,19 @@
 - Review the whole branch `{{.Branch}}` against main with the code-review skill: the standards, and
   whether it does what the spec asks.
 - You did not write this branch. Run the checks yourself, and look at the page yourself when the
-  change is visual (AGENTS.md, "See it"), serving the preview on your `Preview port` instead of the
-  port AGENTS.md names: `make preview PORT=<your port> DIR=tmp/preview-review`, and stop it with
-  `make preview-stop DIR=tmp/preview-review`, never with `pkill`.
+  change is visual, serving the preview on your `Preview port` instead of the port AGENTS.md names:
+  `make preview PORT=<your port> DIR=tmp/preview-review`, in the background, and stop it with
+  `make preview-stop DIR=tmp/preview-review`, never with `pkill`. The agent's own browser is not
+  reachable from a card and cannot see the preview anyway; look with the tool that is there:
+
+      chrome-devtools-axi run < tmp/look.js
+      chrome-devtools-axi screenshot tmp/evidence/review-what.png
+      chrome-devtools-axi stop
+
+  `tmp/look.js` is a few lines of `await page.open("http://127.0.0.1:<your port>/...")`,
+  `await page.fill("<css selector>", "...")`, `await page.click("<css selector>")` and
+  `await page.eval(() => document.body.innerText)`, and `run` prints what they return. Selectors work;
+  a snapshot's `@refs` go stale the moment the page changes.
 - Save the screenshots you take in `tmp/evidence/` of your workspace (at most 3, PNG, named
   `review-what.png`). If a preview data directory you want already exists, use another name instead of
   removing it.
@@ -18,7 +28,10 @@
 - Never push, never merge, never switch branches.
 - Nobody is there to approve anything, and Hermes refuses whatever asks for approval. Never edit
   AGENTS.md, CLAUDE.md or any other agent-instruction file: name the change it needs in your summary.
-  Run commands directly, never through `bash -c`, `sh -c`, `python -c`, a heredoc or `rm -r`: Hermes
-  blocks them.
+  Keep each command one plain command: write a file with write_file and commit it with
+  `git commit -F <file>` rather than wrapping it in `bash -c`, `sh -c`, `python -c` or a heredoc, and
+  start anything long with `background=true` instead of a trailing `&`. A command that runs past five
+  minutes in the foreground loses its container at five minutes and comes back as exit 137: put it in
+  the background with its output in a file and read the file.
 - Finish with kanban_complete: what you found and fixed, and metadata with verification (a list: each
   command you ran and its result), branch and commit. If you cannot fix a finding, call kanban_block with kind "needs_input" and it.
