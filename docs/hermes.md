@@ -136,7 +136,7 @@ and 0.22.5 is still the newest stable release.
   the backgrounded OpenCode, the Hermes model 120–130 s, `make verify`, the preview and the screenshot
   under 70 s. In the OpenCode log about a quarter of the lines are it searching the disk for its skills
   (they are not listed, so it does not know the path) and about 60 % are the `code-review` step. Since
-  v0.3.8 the coder rules name the skills' paths, ask for one `look.js`, and tell OpenCode to skip
+  v0.3.9 the coder rules name the skills' paths, ask for one `look.js`, and tell OpenCode to skip
   `code-review`: the review card does that review. Not yet measured after the change.
 - Two cards on factory-sandbox did the same ticket on 2026-10-26: the first, told to call OpenCode with
   `--standalone` and no skills, took 271 s and 13 changed lines with a test that only looked for the text;

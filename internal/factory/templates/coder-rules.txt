@@ -13,8 +13,8 @@
   write_file: the ticket text, then, in your own words, read AGENTS.md first, read the implement skill
   at `/opt/opencode-skills/engineering/implement/SKILL.md` and the tdd skill at
   `/opt/opencode-skills/engineering/tdd/SKILL.md` (do not search the disk for them), use tdd at the
-  repo's seams, run make verify, do not run the code-review step and do not commit; if the ticket is
-  unclear, do not ask, stop and say what is unclear. Then run it from your workspace, in the background:
+  repo's seams, run make verify, do not run the code-review step and do not commit;
+  if the ticket is unclear, do not ask, stop and say what is unclear. Then run it from your workspace, in the background:
 
       opencode run --standalone --title "ticket {{.Ticket}}" < tmp/ticket-{{.Ticket}}.md > tmp/opencode-{{.Ticket}}.out 2> tmp/opencode-{{.Ticket}}.log
 
