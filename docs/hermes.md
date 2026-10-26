@@ -9,7 +9,8 @@ and 0.22.5 is still the newest stable release.
 
 - Always pass `--board <slug>`: the current board is a file shared by every profile. Never
   `boards switch`. `boards list --json` lists every board with its `slug`, and on Basecamp these are
-  `default`, `factory-sandbox`, `laiacaliente-app` and `torresposso-site`.
+  `default`, `factory-sandbox`, `laiacaliente-app`, `luciotorres-online`, `torresposso-site` and
+  `voxpopuli-digital`. A board's name is its slug, with hyphens and no dots.
 - `list --json` includes each card's `body`, and also `id`, `status`, `assignee`, `skills`, `workspace_path`,
   `workspace_kind`, `branch_name`, `max_runtime_seconds`, `completion_contract`, `max_retries`,
   `model_override`, `result` and `tenant`. It has no `parents` and no `idempotency_key`.
