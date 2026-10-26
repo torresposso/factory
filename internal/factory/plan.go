@@ -280,7 +280,6 @@ func (f *Factory) ticketCards(run PlannedRun, issue int) []Step {
 			Card: NewCard{
 				Title:          fmt.Sprintf("#%d: %s", number, ticket.Issue.Title),
 				Assignee:       assigneeCoder,
-				Skills:         []string{"implement", "tdd"},
 				Workspace:      workspace,
 				MaxRuntime:     runtimeCoder,
 				IdempotencyKey: idempotencyKey(f.Opts.Board, issue, fmt.Sprintf("code:%d", number)),

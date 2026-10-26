@@ -85,6 +85,27 @@ and 0.22.5 is still the newest stable release.
   `security.protected_instruction_files`) waits `approvals.timeout` (300 s by default) before it refuses:
   seen on 2026-10-26, when a coder card lost 10 minutes on two such writes. Since that day `coder` and
   `qa` set `approvals.timeout: 0`, and the card rules forbid those writes and the commands Hermes blocks.
+- A card's model never sees an image itself. `opencode-go` refuses images inside a tool result (its
+  provider profile sets `supports_vision_tool_messages=False`: the relay answers 422), so every
+  `vision_analyze` goes to a second call that is asked to "fully describe and explain everything" before
+  the question, and the card gets that text back: 12–70 s per image on 2026-10-26. The description runs
+  1,200–3,300 characters whatever the question, and a `region` crop did not shorten it (measured that
+  day), so the only saving is fewer looks: the card rules ask for that, and keep Integrate and Review
+  off the tickets' images. `region` crops the original before the downscale, so it is for reading a
+  detail, not for speed.
+- A card writes its code through OpenCode 2.1.4, which the image carries (npm package `@opencode/cli-linux-arm64`,
+  pinned by version and sha256) with Matt Pocock's 38 skills baked in at `/opt/opencode-skills` (pinned by
+  commit and tarball sha256; `github.com/mattpocock/skills`). The cards' `opencode.json`, which lives in the
+  mounted cache (`~/.cache/factory-go/opencode/config/opencode/`), adds that path under `skills` and sets the
+  model. 23 of those skills set `disable-model-invocation`, so OpenCode does not list them — `implement`,
+  `implement-spec`, `to-spec`, `to-tickets` and `retro` among them — and a card loads them by name; `tdd` and
+  `code-review` are listed. In a card, `opencode run` starts a background server inside the card's own
+  container (port 49374) and every later call is a client of it: the server survived the card's exec calls on
+  2026-10-26. `--standalone` is the opposite — a private server per call, no session carried over.
+- Two cards on factory-sandbox did the same ticket on 2026-10-26: the first, told to call OpenCode with
+  `--standalone` and no skills, took 271 s and 13 changed lines with a test that only looked for the text;
+  the flow's card loaded `implement`, ran `tdd`, and its `code-review` subagents pushed it to assert the
+  path's position, 314 s in all and 20 lines.
 - The hooks, `plan` and `clean` run in the container itself, as uid 1001. GitHub commands run with
   `HOME` set to the publisher profile's home (`/opt/data/profiles/publisher/home` by default, `--gh-home` to
   change it), because that is the profile whose `gh` login can push; no card is assigned to `publisher`

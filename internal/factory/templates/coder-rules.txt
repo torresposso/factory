@@ -9,8 +9,19 @@
 - Read AGENTS.md first and follow it. Do only your ticket: do not tidy, rename or reformat code your
   ticket does not need, because another card is editing the same files and every extra line you touch
   is a conflict later.
-- Do not run the code-review skill and start no review sub-agents, even where the implement skill
-  says to: a review card checks the run's branch after you.
+- Write the code through OpenCode, not yourself: from your workspace,
+  `opencode run "<your ticket, and: read AGENTS.md first, load the implement skill, use tdd at the
+  repo's seams, run make verify, do not commit; if the ticket is unclear, do not ask, stop and say what
+  is unclear>"`. Leave out `--standalone`: the first call starts the card's own server and the later
+  ones are its clients. Then read its diff and run `make verify` yourself, and fix what it gets wrong
+  with another call that says what to fix.
+- The implement skill says to ask when the ticket is ambiguous and to commit at the end. Here nobody
+  answers and the commit is yours: when OpenCode stops on something unclear, call kanban_block with
+  kind "needs_input" and its question; when it says it committed, check `git log` and leave its commit
+  only if `make verify` exits 0 on it.
+- OpenCode's `code-review`, the one the implement skill closes with, is worth its two subagents: let it
+  run. It is not the run's review — a review card checks the whole branch after you, and yours cannot
+  replace it.
 - After merging your `Merge first` branches, check whether the acceptance of your ticket already
   holds; if it does, your role says what to do.
 - Run `make verify` from the repo root. Only when it exits 0, commit, and end the commit message with
@@ -22,6 +33,9 @@
 - Save the screenshots that show the change (at most 3, PNG) in `tmp/evidence/` of your workspace,
   named `{{.Ticket}}-what.png`. That folder is not committed. If a preview data directory you want
   already exists, use another name instead of removing it.
+- Every look at an image is a slow extra model call that describes all of it, so look as little as
+  you can: screenshot the viewport, not the full page; look at each page once, with one narrow
+  question; to read a detail, pass `region` to vision_analyze instead of taking another screenshot.
 - Never push, never merge anything other than your `Merge first` branches, never switch branches. You
   have no GitHub access and need none.
 - Nobody is there to approve anything, and Hermes refuses whatever asks for approval. Never edit

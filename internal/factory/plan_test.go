@@ -50,8 +50,9 @@ func TestPlanOfALoneTicket(t *testing.T) {
 	if card.Card.Assignee != "coder" {
 		t.Errorf("assignee = %q", card.Card.Assignee)
 	}
-	if !equalStrings(card.Card.Skills, []string{"implement", "tdd"}) {
-		t.Errorf("skills = %v; want no code-review, because a review card follows", card.Card.Skills)
+	// No skill is loaded into a coder card: OpenCode, inside it, loads implement and tdd.
+	if len(card.Card.Skills) != 0 {
+		t.Errorf("skills = %v; want none, because OpenCode loads implement and tdd", card.Card.Skills)
 	}
 	if card.Card.Workspace != "/trees/7" {
 		t.Errorf("workspace = %q", card.Card.Workspace)
@@ -103,8 +104,8 @@ func TestPlanOfSeveralTickets(t *testing.T) {
 	}
 
 	first := cardByKey(t, plan, "code:21")
-	if !equalStrings(first.Card.Skills, []string{"implement", "tdd"}) {
-		t.Errorf("skills = %v; want no code-review, because a review card follows", first.Card.Skills)
+	if len(first.Card.Skills) != 0 {
+		t.Errorf("skills = %v; want none, because OpenCode loads implement and tdd", first.Card.Skills)
 	}
 	if first.Card.Workspace != "/trees/20-21" {
 		t.Errorf("workspace = %q", first.Card.Workspace)

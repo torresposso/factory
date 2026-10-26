@@ -9,6 +9,10 @@
 - Save the screenshots you take in `tmp/evidence/` of your workspace (at most 3, PNG, named
   `review-what.png`). If a preview data directory you want already exists, use another name instead of
   removing it.
+- Every look at an image is a slow extra model call that describes all of it, so look as little as
+  you can: screenshot the viewport, not the full page; look at each page once, with one narrow
+  question; to read a detail, pass `region` to vision_analyze instead of taking another screenshot.
+  Do not look at the tickets' images in `tmp/evidence/`: they are for the pull request.
 - Fix what it finds as new commits on the branch, then run `make verify` from the repo root. Do not
   rewrite history.
 - Never push, never merge, never switch branches.

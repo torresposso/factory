@@ -16,7 +16,8 @@
 - Gather the evidence: `mkdir -p tmp/evidence`, then for each ticket worktree listed,
   `cp <worktree>/tmp/evidence/*.png tmp/evidence/` (a ticket with no images is fine). Those images
   were taken on each ticket's own branch, before merging: say so in your summary and never present
-  them as the merged result.
+  them as the merged result. Do not look at them: they are for the pull request, and every look is a
+  slow extra model call.
 - If a merge leaves a committed generated file stale (two tickets changed its inputs), regenerate it
   as the repo's AGENTS.md says and commit the result with the merge. Never hand-edit a generated file.
 - If you serve the preview, use your `Preview port` and stop it before you finish with

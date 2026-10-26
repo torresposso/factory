@@ -71,7 +71,11 @@ func TestCoderCardBody(t *testing.T) {
 		"Preview port: 8101",
 		"Merge first: factory/20-21",
 		"## Coder rules",
-		"a review card checks the run's branch after you",
+		"Write the code through OpenCode",
+		"Leave out `--standalone`",
+		"a review card checks the whole branch after you",
+		"if the ticket is unclear, do not ask",
+		"call kanban_block with\n  kind \"needs_input\" and its question",
 		"Refs #22",
 		"make verify",
 		"make preview PORT=<your port> DIR=tmp/preview-22",
@@ -121,7 +125,8 @@ func TestLoneTicketCardBody(t *testing.T) {
 		"Branch: factory/7",
 		"Preview port: 8100",
 		"## Coder rules",
-		"a review card checks the run's branch after you",
+		"Write the code through OpenCode",
+		"a review card checks the whole branch after you",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the lone ticket's card does not contain %q:\n%s", want, body)
