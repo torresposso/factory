@@ -79,6 +79,11 @@ and 0.22.5 is still the newest stable release.
   (`terminal.backend: docker`), as uid 1001, with the card's directory as `/workspace` and only
   `/home/ubuntu/repos` and the Go cache mounted. `HOME` is `/tmp`, so `/opt/data` — and with it every `gh`
   login — is out of reach: a coder card builds, tests and commits, and only `publish` pushes.
+- A card has nobody to answer an approval prompt. Hermes refuses a dangerous command at once in that
+  case, but a write to an agent-instruction file (`AGENTS.md`, `CLAUDE.md`, …;
+  `security.protected_instruction_files`) waits `approvals.timeout` (300 s by default) before it refuses:
+  seen on 2026-10-26, when a coder card lost 10 minutes on two such writes. Since that day `coder` and
+  `qa` set `approvals.timeout: 0`, and the card rules forbid those writes and the commands Hermes blocks.
 - The hooks, `plan` and `clean` run in the container itself, as uid 1001. GitHub commands run with
   `HOME` set to the publisher profile's home (`/opt/data/profiles/publisher/home` by default, `--gh-home` to
   change it), because that is the profile whose `gh` login can push; no card is assigned to `publisher`

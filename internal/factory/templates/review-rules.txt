@@ -12,5 +12,9 @@
 - Fix what it finds as new commits on the branch, then run `make verify` from the repo root. Do not
   rewrite history.
 - Never push, never merge, never switch branches.
+- Nobody is there to approve anything, and Hermes refuses whatever asks for approval. Never edit
+  AGENTS.md, CLAUDE.md or any other agent-instruction file: name the change it needs in your summary.
+  Run commands directly, never through `bash -c`, `sh -c`, `python -c`, a heredoc or `rm -r`: Hermes
+  blocks them.
 - Finish with kanban_complete: what you found and fixed, and metadata with verification (a list: each
   command you ran and its result), branch and commit. If you cannot fix a finding, call kanban_block with kind "needs_input" and it.

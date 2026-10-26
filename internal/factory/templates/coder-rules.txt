@@ -24,6 +24,10 @@
   already exists, use another name instead of removing it.
 - Never push, never merge anything other than your `Merge first` branches, never switch branches. You
   have no GitHub access and need none.
+- Nobody is there to approve anything, and Hermes refuses whatever asks for approval. Never edit
+  AGENTS.md, CLAUDE.md or any other agent-instruction file: if your ticket seems to need a change there,
+  say so in your summary. Run commands directly, never through `bash -c`, `sh -c`, `python -c`, a
+  heredoc or `rm -r`: Hermes blocks them.
 - Finish with kanban_complete: a short summary that says what you changed and in which files, and
   metadata with the keys verification (a list: each command you ran and its result), branch, commit
   (the sha) and changed_files.

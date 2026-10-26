@@ -22,6 +22,10 @@
 - If you serve the preview, use your `Preview port` and stop it before you finish with
   `make preview-stop DIR=<the DIR you served>`, never with `pkill`.
 - Never push, never switch branches, never edit a ticket's own worktree.
+- Nobody is there to approve anything, and Hermes refuses whatever asks for approval. Never edit
+  AGENTS.md, CLAUDE.md or any other agent-instruction file, not even to resolve a conflict: name it in
+  your summary. Run commands directly, never through `bash -c`, `sh -c`, `python -c`, a heredoc or
+  `rm -r`: Hermes blocks them.
 - Finish with kanban_complete: a summary with one line per ticket (merged clean, or the files that
   conflicted and how you resolved each), and metadata with the keys verification (a list: each command
   you ran and its result), branch, commit and conflicts (how many files conflicted in all).

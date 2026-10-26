@@ -241,3 +241,17 @@ func TestRulesNameOnlyTheMakefileContract(t *testing.T) {
 		}
 	}
 }
+
+// A card runs with nobody to answer an approval prompt: every rules file keeps the worker off the
+// writes Hermes asks a human about, so it never spends a turn on one.
+func TestRulesKeepTheWorkerOffApprovals(t *testing.T) {
+	data := rulesData{Repo: "torresposso/laiacaliente-app", Issue: 20, Ticket: 21, Branch: "factory/20-21"}
+	for _, name := range []string{"coder-rules.txt", "integration-rules.txt", "review-rules.txt"} {
+		rendered := rules(name, data)
+		for _, wanted := range []string{"agent-instruction file", "`bash -c`", "heredoc"} {
+			if !strings.Contains(rendered, wanted) {
+				t.Errorf("%s does not say %q", name, wanted)
+			}
+		}
+	}
+}
