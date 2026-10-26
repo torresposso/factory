@@ -137,7 +137,10 @@ and 0.22.5 is still the newest stable release.
   under 70 s. In the OpenCode log about a quarter of the lines are it searching the disk for its skills
   (they are not listed, so it does not know the path) and about 60 % are the `code-review` step. Since
   v0.3.9 the coder rules name the skills' paths, ask for one `look.js`, and tell OpenCode to skip
-  `code-review`: the review card does that review. Not yet measured after the change.
+  `code-review`: the review card does that review. Measured on spec #69 the next run: OpenCode fell from about 430 s to 150–210 s a ticket, but the
+  cards still took 470–615 s because they polled it with `sleep` calls of 45–120 s and overslept by
+  90–150 s, so since v0.3.10 the rules wait on the `.out` file in one bounded loop and ask the card to
+  plan its commands and send the ones that follow each other together.
 - Two cards on factory-sandbox did the same ticket on 2026-10-26: the first, told to call OpenCode with
   `--standalone` and no skills, took 271 s and 13 changed lines with a test that only looked for the text;
   the flow's card loaded `implement`, ran `tdd`, and its `code-review` subagents pushed it to assert the

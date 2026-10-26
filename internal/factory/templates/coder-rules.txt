@@ -20,8 +20,13 @@
 
   with `background=true`. The ticket goes in on stdin, byte for byte, so no quoting mangles it, and
   `--standalone` gives the call its own server, so no other card's port is in the way. `.out` takes its
-  final message and the exit code; `.log` is the transcript as it happens, so `tail` and `wc -c` tell
-  you how far along it is. Then read its diff and run `make verify` yourself, and fix what it gets wrong
+  final message and the exit code; `.log` is the transcript as it happens. Wait for it with one
+  command that returns the moment `.out` has content, not with `sleep` calls of your own guessing:
+
+      for i in $(seq 90); do [ -s tmp/opencode-{{.Ticket}}.out ] && break; sleep 3; done; wc -c tmp/opencode-{{.Ticket}}.log tmp/opencode-{{.Ticket}}.out
+
+  It gives up at 270 s, under the five minutes a foreground command has: if `.out` is still empty,
+  run it again. Then read its diff and run `make verify` yourself, and fix what it gets wrong
   with another call that says what to fix: `opencode run --standalone -c "<what to fix>"` continues the
   session you just had, in this workspace.
 - The implement skill says to ask when the ticket is ambiguous and to commit at the end. Here nobody
@@ -30,6 +35,12 @@
   only if `make verify` exits 0 on it.
 - Do not run OpenCode's `code-review` here: it spends two subagents and minutes on what the review
   card does next. A review card checks the whole branch after you, and that is where the review is.
+- Plan your commands before you run the first one, and send together the ones that follow each other
+  with nothing to decide in between: every separate call is a round trip to the model. Typical groups:
+  the merges of `Merge first`; the diff, `git status` and `make verify`; `git add -A && git commit -F`
+  with the checks; the preview start, the wait for its port, `chrome-devtools-axi run`, the screenshot
+  and the stop. Chain them with `&&`, or `;` where a failure should not stop the rest, and look at the
+  output once at the end.
 - After merging your `Merge first` branches, check whether the acceptance of your ticket already
   holds; if it does, your role says what to do.
 - Run `make verify` from the repo root. Only when it exits 0, commit, and end the commit message with

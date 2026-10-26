@@ -79,6 +79,8 @@ func TestCoderCardBody(t *testing.T) {
 		"read tmp/evidence/22-what.png",
 		"/opt/opencode-skills/engineering/implement/SKILL.md",
 		"Do not run OpenCode's `code-review` here",
+		"[ -s tmp/opencode-22.out ]",
+		"Plan your commands before you run the first one",
 		"A review card checks the whole branch after you",
 		"if the ticket is unclear, do not ask",
 		"call kanban_block with\n  kind \"needs_input\" and its question",
