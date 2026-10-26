@@ -15,14 +15,18 @@
   `tmp/look.js` is a few lines of `await page.open("http://127.0.0.1:<your port>/...")`,
   `await page.fill("<css selector>", "...")`, `await page.click("<css selector>")` and
   `await page.eval(() => document.body.innerText)`, and `run` prints what they return. Selectors work;
-  a snapshot's `@refs` go stale the moment the page changes.
+  a snapshot's `@refs` go stale the moment the page changes. Screenshot the viewport, not the whole
+  page, and crop a long page to the part you care about.
 - Save the screenshots you take in `tmp/evidence/` of your workspace (at most 3, PNG, named
   `review-what.png`). If a preview data directory you want already exists, use another name instead of
   removing it.
-- Every look at an image is a slow extra model call that describes all of it, so look as little as
-  you can: screenshot the viewport, not the full page; look at each page once, with one narrow
-  question; to read a detail, pass `region` to vision_analyze instead of taking another screenshot.
-  Do not look at the tickets' images in `tmp/evidence/`: they are for the pull request.
+- Then look at the screenshot with OpenCode, which reads the image itself, once and narrowly:
+
+      opencode run --standalone "read tmp/evidence/review-what.png and say whether <the one visual thing the spec asks for>; do not change any file"
+
+  It answers in a few seconds and reads pixels; do not use `vision_analyze`, which spends a second
+  model call describing the whole image in text first. Do not look at the tickets' images in
+  `tmp/evidence/`: they are for the pull request.
 - Fix what it finds as new commits on the branch, then run `make verify` from the repo root. Do not
   rewrite history.
 - Never push, never merge, never switch branches.

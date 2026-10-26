@@ -1,6 +1,6 @@
 # Hermes facts the program depends on
 
-Checked on Hermes 0.22.5 (upstream `bf0203a7`) on 2026-10-24, in `hermes kanban ... --help` and in the JSON
+Checked on Hermes 0.22.5 (upstream `bf0203a7`) between 2026-10-24 and 2026-10-26, in `hermes kanban ... --help` and in the JSON
 the CLI prints inside the `hermes` container on Basecamp, and — where the JSON says nothing — in Hermes's own
 source at tag `v0.22.5`. Basecamp's image pins that tag (`nousresearch/hermes-agent:v0.22.5@sha256:9c556157…`),
 and 0.22.5 is still the newest stable release.
@@ -37,8 +37,9 @@ and 0.22.5 is still the newest stable release.
   on 2026-10-24: the hook in the assignee's profile ran in the worker without an allowlist entry, with
   the card's workspace as `cwd`, and got `extra.task_id`, `board`, `assignee`, `run_id` and `summary` on
   stdin, but not the run's metadata. It only fires for the profile whose config has it. On 0.21.6 the
-  worker registered no shell hooks, which is why the program reads the board instead — and no profile on
-  Basecamp has one configured today, so the board is still the only source.
+  worker registered no shell hooks, which is why the program first read the board instead; since
+  2026-10-25 the hooks are configured (docs/adr/0002), and the board is still where a run's cards and
+  their `summary` and `metadata` are read.
 - Tried on Basecamp on 2026-10-25 with all three kanban hooks in every profile: `kanban_task_blocked`
   behaves like `kanban_task_completed` (the assignee's worker, the workspace as `cwd`, `extra.reason`
   instead of `summary`), and a worker writes its own profile's hooks into that profile's
@@ -67,7 +68,7 @@ and 0.22.5 is still the newest stable release.
   comments of that run on the issue — the soonest the issue can see them.
 - The dispatcher is not a service of its own: it lives inside the gateway that owns the board. On Basecamp
   `kanban.dispatch_interval_seconds` is 10, `review_dispatch` is on, and `max_in_progress` is 3 in the root
-  `config.yaml` and in all four profiles, so it does not matter which one the gateway reads.
+  `config.yaml` and in all three profiles (`coder`, `qa`, `publisher`), so it does not matter which one the gateway reads.
 
 ## Where it runs
 
@@ -85,14 +86,19 @@ and 0.22.5 is still the newest stable release.
   `security.protected_instruction_files`) waits `approvals.timeout` (300 s by default) before it refuses:
   seen on 2026-10-26, when a coder card lost 10 minutes on two such writes. Since that day `coder` and
   `qa` set `approvals.timeout: 0`, and the card rules forbid those writes and the commands Hermes blocks.
-- A card's model never sees an image itself. `opencode-go` refuses images inside a tool result (its
-  provider profile sets `supports_vision_tool_messages=False`: the relay answers 422), so every
-  `vision_analyze` goes to a second call that is asked to "fully describe and explain everything" before
-  the question, and the card gets that text back: 12–70 s per image on 2026-10-26. The description runs
-  1,200–3,300 characters whatever the question, and a `region` crop did not shorten it (measured that
-  day), so the only saving is fewer looks: the card rules ask for that, and keep Integrate and Review
-  off the tickets' images. `region` crops the original before the downscale, so it is for reading a
-  detail, not for speed.
+- A card's own Hermes model never sees an image: the `opencode-go` profile sets
+  `supports_vision_tool_messages=False` and the tool-result envelope Hermes builds gets a 422, so
+  `vision_analyze` falls back to a second call that describes the whole image in text — 1,200–3,300
+  characters whatever the question, 12–70 s by the 2026-10-26 measurements (9.9–16.4 s across eight
+  card looks that day). The relay is not the limit: probed that day, it answers 200 to an image inside
+  a tool result; it is the envelope. OpenCode is unaffected because it lifts the image out of the tool
+  result and sends it as a **user** message (captured body: `role:"tool"` with "Image read
+  successfully", then `role:"user"` with the base64 image). A blind probe on a control PNG
+  (`TUCAN 84 MAGENTA / codigo 7f3a92`, absent from every text file) read both lines in 3 s for
+  $0.00019, and `-c` cost ~55% less than a fresh session because the prompt rides as cache read. Cards
+  therefore hand screenshots to OpenCode now — `-c` on a coder, a fresh call on the reviewer — and
+  `vision_analyze` stays for the rest of Hermes. Integrate still does not look at the tickets' images.
+  `region` crops the original before the downscale, so it is for reading a detail, not for speed.
 - A card writes its code through OpenCode 2.1.4, which the image carries (npm package `@opencode/cli-linux-arm64`,
   pinned by version and sha256) with Matt Pocock's 38 skills baked in at `/opt/opencode-skills` (pinned by
   commit and tarball sha256; `github.com/mattpocock/skills`). The cards' `opencode.json`, which lives in the
@@ -105,7 +111,10 @@ and 0.22.5 is still the newest stable release.
   the flag the first call starts a server on 49374 and the later ones are its clients — which dies with
   `Managed service port 49374 already in use` when anything else holds that port. The ticket goes in on
   stdin: argv is wrapped in quotes and re-escaped, so `"$(cat ticket.md)"` arrived 25 characters longer
-  and with its quotes altered that day, while stdin arrived byte for byte.
+  and with its quotes altered that day, while stdin arrived byte for byte. Both card profiles, `coder`
+  and `qa`, set `terminal.docker_env.XDG_CONFIG_HOME` to the mounted cache's `opencode/config` and
+  forward `OPENCODE_GO_API_KEY` by name; a profile without the pair gets OpenCode's default model
+  (`big-pickle`), which cannot read an image (probed 2026-10-26: `CANNOT SEE`).
 - A foreground terminal command has five minutes. `terminal.lifetime_seconds` is 300 and
   `_cleanup_inactive_envs` recycles any sandbox that has no background process of its own, so a command
   still running at 300 s gets its container stopped and returns `exit 137`

@@ -76,6 +76,7 @@ func TestCoderCardBody(t *testing.T) {
 		"tmp/ticket-22.md",
 		"background=true",
 		"chrome-devtools-axi run",
+		"read tmp/evidence/22-what.png",
 		"a review card checks the whole branch after you",
 		"if the ticket is unclear, do not ask",
 		"call kanban_block with\n  kind \"needs_input\" and its question",
@@ -207,6 +208,7 @@ func TestReviewCardBody(t *testing.T) {
 		"Preview port: 8102",
 		"## Review rules",
 		"code-review skill",
+		"read tmp/evidence/review-what.png",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the review card does not contain %q:\n%s", want, body)
