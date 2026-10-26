@@ -131,6 +131,13 @@ and 0.22.5 is still the newest stable release.
   profile's state database: `/opt/data/profiles/<profile>/state.db`, table `messages`, one row per turn
   with its `tool_name` and `tool_calls`. Read it with `sqlite3` in read-only mode; the card's own log
   file under `/opt/data/kanban/boards/<board>/logs/` holds only that session line.
+- Where a coder card's time goes (three tickets of factory-sandbox spec #64, 2026-10-26, read from the
+  profile's `state.db` and the cards' `tmp/opencode-N.log`): 66–71 % of a card of 470–730 s is waiting for
+  the backgrounded OpenCode, the Hermes model 120–130 s, `make verify`, the preview and the screenshot
+  under 70 s. In the OpenCode log about a quarter of the lines are it searching the disk for its skills
+  (they are not listed, so it does not know the path) and about 60 % are the `code-review` step. Since
+  v0.3.8 the coder rules name the skills' paths, ask for one `look.js`, and tell OpenCode to skip
+  `code-review`: the review card does that review. Not yet measured after the change.
 - Two cards on factory-sandbox did the same ticket on 2026-10-26: the first, told to call OpenCode with
   `--standalone` and no skills, took 271 s and 13 changed lines with a test that only looked for the text;
   the flow's card loaded `implement`, ran `tdd`, and its `code-review` subagents pushed it to assert the

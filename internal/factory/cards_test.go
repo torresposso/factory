@@ -77,7 +77,9 @@ func TestCoderCardBody(t *testing.T) {
 		"background=true",
 		"chrome-devtools-axi run",
 		"read tmp/evidence/22-what.png",
-		"a review card checks the whole branch after you",
+		"/opt/opencode-skills/engineering/implement/SKILL.md",
+		"Do not run OpenCode's `code-review` here",
+		"A review card checks the whole branch after you",
 		"if the ticket is unclear, do not ask",
 		"call kanban_block with\n  kind \"needs_input\" and its question",
 		"Refs #22",
@@ -130,7 +132,7 @@ func TestLoneTicketCardBody(t *testing.T) {
 		"Preview port: 8100",
 		"## Coder rules",
 		"Write the code through OpenCode",
-		"a review card checks the whole branch after you",
+		"A review card checks the whole branch after you",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the lone ticket's card does not contain %q:\n%s", want, body)

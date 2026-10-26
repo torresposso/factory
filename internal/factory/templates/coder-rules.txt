@@ -10,9 +10,11 @@
   ticket does not need, because another card is editing the same files and every extra line you touch
   is a conflict later.
 - Write the code through OpenCode, not yourself. Write the ticket to `tmp/ticket-{{.Ticket}}.md` with
-  write_file: the ticket text, then, in your own words, read AGENTS.md first, load the implement skill,
-  use tdd at the repo's seams, run make verify, do not commit; if the ticket is unclear, do not ask,
-  stop and say what is unclear. Then run it from your workspace, in the background:
+  write_file: the ticket text, then, in your own words, read AGENTS.md first, read the implement skill
+  at `/opt/opencode-skills/engineering/implement/SKILL.md` and the tdd skill at
+  `/opt/opencode-skills/engineering/tdd/SKILL.md` (do not search the disk for them), use tdd at the
+  repo's seams, run make verify, do not run the code-review step and do not commit; if the ticket is
+  unclear, do not ask, stop and say what is unclear. Then run it from your workspace, in the background:
 
       opencode run --standalone --title "ticket {{.Ticket}}" < tmp/ticket-{{.Ticket}}.md > tmp/opencode-{{.Ticket}}.out 2> tmp/opencode-{{.Ticket}}.log
 
@@ -26,9 +28,8 @@
   answers and the commit is yours: when OpenCode stops on something unclear, call kanban_block with
   kind "needs_input" and its question; when it says it committed, check `git log` and leave its commit
   only if `make verify` exits 0 on it.
-- OpenCode's `code-review`, the one the implement skill closes with, is worth its two subagents: let it
-  run. It is not the run's review — a review card checks the whole branch after you, and yours cannot
-  replace it.
+- Do not run OpenCode's `code-review` here: it spends two subagents and minutes on what the review
+  card does next. A review card checks the whole branch after you, and that is where the review is.
 - After merging your `Merge first` branches, check whether the acceptance of your ticket already
   holds; if it does, your role says what to do.
 - Run `make verify` from the repo root. Only when it exits 0, commit, and end the commit message with
@@ -44,7 +45,8 @@
       chrome-devtools-axi screenshot tmp/evidence/{{.Ticket}}-what.png
       chrome-devtools-axi stop
 
-  `tmp/look.js` is a few lines of `await page.open("http://127.0.0.1:<your port>/...")`,
+  Write `tmp/look.js` once, with every page and every step the ticket touches in it, and read what
+  `run` prints; do not write a second script for what the first could have printed. It is a few lines of `await page.open("http://127.0.0.1:<your port>/...")`,
   `await page.fill("<css selector>", "...")`, `await page.click("<css selector>")` and
   `await page.eval(() => document.body.innerText)`, and `run` prints what they return. Selectors work;
   a snapshot's `@refs` go stale the moment the page changes. Screenshot the viewport, not the whole
