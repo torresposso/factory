@@ -24,9 +24,8 @@ echo "<sha256 from SHA256SUMS>  factory-linux-arm64" | sha256sum -c -
 install -m 0755 factory-linux-arm64 /usr/local/bin/factory
 ```
 
-The cards' sandbox (the image Hermes starts per card) needs `opencode` and `chrome-devtools-axi` on
-its `PATH`: the coder writes its code and reads its screenshots through the first and looks at the
-preview with the second (docs/hermes.md has how they are set up).
+The cards' sandbox (the image Hermes starts per card) needs `chrome-devtools-axi` on its `PATH`, to look at
+the preview, and the skills the coder rules name by path (docs/hermes.md has how they are set up).
 
 Then the kanban hooks, in each profile's `config.yaml` (docs/adr/0002). They run in the `hermes`
 container, not in a card's sandbox, so `factory` and the `gh` login are in reach:

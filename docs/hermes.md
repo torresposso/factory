@@ -86,36 +86,23 @@ and 0.22.5 is still the newest stable release.
   `security.protected_instruction_files`) waits `approvals.timeout` (300 s by default) before it refuses:
   seen on 2026-10-26, when a coder card lost 10 minutes on two such writes. Since that day `coder` and
   `qa` set `approvals.timeout: 0`, and the card rules forbid those writes and the commands Hermes blocks.
-- A card's own Hermes model never sees an image: the `opencode-go` profile sets
-  `supports_vision_tool_messages=False` and the tool-result envelope Hermes builds gets a 422, so
-  `vision_analyze` falls back to a second call that describes the whole image in text — 1,200–3,300
-  characters whatever the question, 12–70 s by the 2026-10-26 measurements (9.9–16.4 s across eight
-  card looks that day). The relay is not the limit: probed that day, it answers 200 to an image inside
-  a tool result; it is the envelope. OpenCode is unaffected because it lifts the image out of the tool
-  result and sends it as a **user** message (captured body: `role:"tool"` with "Image read
-  successfully", then `role:"user"` with the base64 image). A blind probe on a control PNG
-  (`TUCAN 84 MAGENTA / codigo 7f3a92`, absent from every text file) read both lines in 3 s for
-  $0.00019, and `-c` cost ~55% less than a fresh session because the prompt rides as cache read. Cards
-  therefore hand screenshots to OpenCode now — `-c` on a coder, a fresh call on the reviewer — and
-  `vision_analyze` stays for the rest of Hermes. Integrate still does not look at the tickets' images.
-  `region` crops the original before the downscale, so it is for reading a detail, not for speed.
-- OpenCode 2.1.4 is in the image only to read a screenshot (a card's own model never sees an image), and for the
-  skills; a card writes its own code. The image carries OpenCode (npm package `@opencode/cli-linux-arm64`,
-  pinned by version and sha256) with Matt Pocock's 38 skills baked in at `/opt/opencode-skills` (pinned by
-  commit and tarball sha256; `github.com/mattpocock/skills`). The cards' `opencode.json`, which lives in the
-  mounted cache (`~/.cache/factory-go/opencode/config/opencode/`), adds that path under `skills` and sets the
-  model. 23 of those skills set `disable-model-invocation`, so OpenCode does not list them — `implement`,
-  `implement-spec`, `to-spec`, `to-tickets` and `retro` among them — and a card loads them by name; `tdd` and
-  `code-review` are listed. A card calls `opencode run --standalone`: a private server per call, on no
-  fixed port, and `-c` still continues the session the previous call left in that workspace (probed in a
-  card on 2026-10-26, second call from its own exec, which answered with the first one's words). Without
-  the flag the first call starts a server on 49374 and the later ones are its clients — which dies with
-  `Managed service port 49374 already in use` when anything else holds that port. The ticket goes in on
-  stdin: argv is wrapped in quotes and re-escaped, so `"$(cat ticket.md)"` arrived 25 characters longer
-  and with its quotes altered that day, while stdin arrived byte for byte. Both card profiles, `coder`
-  and `qa`, set `terminal.docker_env.XDG_CONFIG_HOME` to the mounted cache's `opencode/config` and
-  forward `OPENCODE_GO_API_KEY` by name; a profile without the pair gets OpenCode's default model
-  (`big-pickle`), which cannot read an image (probed 2026-10-26: `CANNOT SEE`).
+- `vision_analyze` on the `opencode-go` profile goes through a text fallback: the profile sets
+  `supports_vision_tool_messages=False`, a hard veto on images inside tool results, so a second call describes
+  the whole image in text (1,200–3,300 characters whatever the question; 12–70 s on 2026-10-26, 9.9–16.4 s across
+  eight card looks that day). OpenCode lifts the image out of the tool result and sends it as a **user**
+  message, which is why the cards used it to look until v0.4.2 (3 s on a small control PNG). `region` crops the
+  original before the downscale, so it is for reading a detail, not for speed. Integrate does not look at the
+  tickets' images.
+- The model of a card sees images (`deepseek-v4.1-flash` read a magenta test PNG through the relay on 2026-10-27,
+  as a tool result and as a user message alike), and the relay now takes list-type tool content that the
+  `opencode-go` profile's comment says it 422s. The profile's veto is still in Hermes, so `vision_analyze` goes
+  through its text fallback. Looking at one 1905×2053 screenshot with one narrow question, four runs each, took
+  8.1 s with the veto lifted by a profile plugin in the coder's home, 9.0 s with Hermes as it comes and 8.3 s with
+  OpenCode, and all twelve answers were right. A broad question ("describe the page") is what misreads small
+  text. Since v0.5.0 the cards look with `vision_analyze` and a narrow question, with no plugin and no OpenCode.
+- Matt Pocock's 38 skills are baked into the image at `/opt/opencode-skills` (pinned by commit and tarball
+  sha256; `github.com/mattpocock/skills`) and the coder rules name the two they use by path, `implement` and
+  `tdd`: a card reads them with its file tools. The directory keeps its old name.
 - Who writes the code in a coder card was measured on 2026-10-27 with the same tickets: spec #79 (the reading
   time of a Nota: a function, the list, the page) copied six times in factory-sandbox, one run at a time, the
   copies' ticket texts hashing the same, each branched from the same `main` (`d7433f0`). The order was PiG,
@@ -123,8 +110,8 @@ and 0.22.5 is still the newest stable release.
   with Hermes alone, 605 s and 660 s with PiG (0.5.3) and 798 s and 539 s with OpenCode; the whole run 747 s and
   926 s, 753 s and 951 s, 972 s and 879 s. The Review card took 261–468 s with the same rules in every run, so
   the totals do not tell the three apart; the ticket cards do. The diffs were alike (4–5 files, 88–126 lines).
-  Since v0.5.0 the card's own model writes the code, tests first, and looks at its screenshot through
-  `opencode run --standalone`; PiG and the `--worker` flag that chose between them are gone (v0.4.0–v0.4.2).
+  Since v0.5.0 the card's own model writes the code, tests first, and looks at its screenshot with
+  `vision_analyze`; PiG, OpenCode and the `--worker` flag that chose between them are gone (v0.4.0–v0.4.2).
   Compare any other change the same way: the same tickets, one run at a time (two cores) and more than once.
 - A foreground terminal command has five minutes. `terminal.lifetime_seconds` is 300 and
   `_cleanup_inactive_envs` recycles any sandbox that has no background process of its own, so a command

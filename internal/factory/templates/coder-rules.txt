@@ -36,12 +36,9 @@
   `run` prints only what the script writes to stdout, so an `eval` without `console.log` prints nothing and
   a `return` is an error. Screenshot the viewport (at most 3 PNG in `tmp/evidence/`, not committed).
   If a preview data directory you want already exists, use another name.
-- Then look at the screenshot with OpenCode, which reads the image itself, once and narrowly; your own
-  model never sees an image:
-
-      opencode run --standalone "read tmp/evidence/{{.Ticket}}-what.png and say whether <the one visual thing the ticket asks for>; do not change any file"
-
-  Do not use `vision_analyze`. If it is wrong, fix it yourself, run `make verify` and commit again.
+- Then look at the screenshot with `vision_analyze`, once and narrowly: pass the image path and one question
+  about the one visual thing the ticket asks for ("which text is under the title?"), not "describe the
+  page". If it is wrong, fix it yourself, run `make verify` and commit again.
 - After merging your `Merge first` branches, check whether the acceptance of your ticket already
   holds; if it does, your role says what to do.
 - Never push, never merge anything other than your `Merge first` branches, never switch branches. You
