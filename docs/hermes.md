@@ -126,7 +126,13 @@ and 0.22.5 is still the newest stable release.
   Hermes card with OpenCode. PiG reads an image with its own `read` tool, as a user message, so
   `vision_analyze` is not involved. The coder profile sets `PIG_HOME` to the mounted cache's `pig`
   directory, whose `agent/settings.json` holds `defaultProvider` and `defaultModel`, and `PIG_OFFLINE=1`
-  (no update check, no catalog refresh). Not measured yet on a whole spec.
+  (no update check, no catalog refresh). The first whole spec with it (factory-sandbox #79, 1208 s) is not
+  comparable with the earlier ones (#64, #69, #74), which were other tickets.
+- Since v0.4.2 `factory plan --worker pig|hermes|opencode` picks what the coder cards hand their ticket to
+  (`coder-rules-<worker>.txt`; `pig` is the default), so the same tickets can be run once per worker: `hermes`
+  has the card's own model write the code, `opencode` is the v0.3.10 rules. PiG's whole session is kept in
+  the card's `tmp/pig-sessions/`, to read where its time went. Compare workers only on the same tickets,
+  one run at a time (two cores), and more than once: the same pure-function ticket took 100 s and 371 s.
 - A foreground terminal command has five minutes. `terminal.lifetime_seconds` is 300 and
   `_cleanup_inactive_envs` recycles any sandbox that has no background process of its own, so a command
   still running at 300 s gets its container stopped and returns `exit 137`

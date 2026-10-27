@@ -1,0 +1,91 @@
+## Coder rules
+
+- Work only in your workspace, on the branch checked out there (the `Branch` line of "Your run").
+  Other cards work at the same time in other folders; never look for them and never touch them.
+- If "Your run" has a `Merge first` line, start by merging each branch it lists, in that order, one at
+  a time: `git merge --no-edit <branch>`. Those are the tickets yours is built on. If a merge stops on
+  a conflict, resolve it so both sides still do what they did, and commit. If you cannot, call
+  kanban_block with kind "needs_input" and the conflicting files.
+- Read AGENTS.md first and follow it. Do only your ticket: do not tidy, rename or reformat code your
+  ticket does not need, because another card is editing the same files and every extra line you touch
+  is a conflict later.
+- Write the code through OpenCode, not yourself. Write the ticket to `tmp/ticket-{{.Ticket}}.md` with
+  write_file: the ticket text, then, in your own words, read AGENTS.md first, read the implement skill
+  at `/opt/opencode-skills/engineering/implement/SKILL.md` and the tdd skill at
+  `/opt/opencode-skills/engineering/tdd/SKILL.md` (do not search the disk for them), use tdd at the
+  repo's seams, run make verify, do not run the code-review step and do not commit;
+  if the ticket is unclear, do not ask, stop and say what is unclear. Then run it from your workspace, in the background:
+
+      opencode run --standalone --title "ticket {{.Ticket}}" < tmp/ticket-{{.Ticket}}.md > tmp/opencode-{{.Ticket}}.out 2> tmp/opencode-{{.Ticket}}.log
+
+  with `background=true`. The ticket goes in on stdin, byte for byte, so no quoting mangles it, and
+  `--standalone` gives the call its own server, so no other card's port is in the way. `.out` takes its
+  final message and the exit code; `.log` is the transcript as it happens. Wait for it with one
+  command that returns the moment `.out` has content, not with `sleep` calls of your own guessing:
+
+      for i in $(seq 90); do [ -s tmp/opencode-{{.Ticket}}.out ] && break; sleep 3; done; wc -c tmp/opencode-{{.Ticket}}.log tmp/opencode-{{.Ticket}}.out
+
+  It gives up at 270 s, under the five minutes a foreground command has: if `.out` is still empty,
+  run it again. Then read its diff and run `make verify` yourself, and fix what it gets wrong
+  with another call that says what to fix: `opencode run --standalone -c "<what to fix>"` continues the
+  session you just had, in this workspace.
+- The implement skill says to ask when the ticket is ambiguous and to commit at the end. Here nobody
+  answers and the commit is yours: when OpenCode stops on something unclear, call kanban_block with
+  kind "needs_input" and its question; when it says it committed, check `git log` and leave its commit
+  only if `make verify` exits 0 on it.
+- Do not run OpenCode's `code-review` here: it spends two subagents and minutes on what the review
+  card does next. A review card checks the whole branch after you, and that is where the review is.
+- Plan your commands before you run the first one, and send together the ones that follow each other
+  with nothing to decide in between: every separate call is a round trip to the model. Typical groups:
+  the merges of `Merge first`; the diff, `git status` and `make verify`; `git add -A && git commit -F`
+  with the checks; the preview start, the wait for its port, `chrome-devtools-axi run`, the screenshot
+  and the stop. Chain them with `&&`, or `;` where a failure should not stop the rest, and look at the
+  output once at the end.
+- After merging your `Merge first` branches, check whether the acceptance of your ticket already
+  holds; if it does, your role says what to do.
+- Run `make verify` from the repo root. Only when it exits 0, commit, and end the commit message with
+  `Refs #{{.Ticket}}` for your ticket.
+- A change to a page is not done until you have looked at it: serve the preview on your `Preview port`
+  instead of the port AGENTS.md names — `make preview PORT=<your port> DIR=tmp/preview-{{.Ticket}}`,
+  in the background — and stop it before you finish with
+  `make preview-stop DIR=tmp/preview-{{.Ticket}}`, never with `pkill`. The agent's own browser is not
+  reachable from a card and cannot see the preview anyway; look with the tool that is there, which
+  needs no setup:
+
+      chrome-devtools-axi run < tmp/look.js
+      chrome-devtools-axi screenshot tmp/evidence/{{.Ticket}}-what.png
+      chrome-devtools-axi stop
+
+  Write `tmp/look.js` once, with every page and every step the ticket touches in it, and read what
+  `run` prints; do not write a second script for what the first could have printed. It is a few lines of `await page.open("http://127.0.0.1:<your port>/...")`,
+  `await page.fill("<css selector>", "...")`, `await page.click("<css selector>")` and
+  `console.log(await page.eval(() => document.body.innerText))`, and `run` prints only what the script
+  writes to stdout, so an `eval` without `console.log` prints nothing and a `return` is an error. Selectors work;
+  a snapshot's `@refs` go stale the moment the page changes. Screenshot the viewport, not the whole
+  page, and crop a long page to the part you care about.
+- Save the screenshots that show the change (at most 3, PNG) in `tmp/evidence/` of your workspace,
+  named `{{.Ticket}}-what.png`. That folder is not committed. If a preview data directory you want
+  already exists, use another name instead of removing it.
+- Then look at the screenshot through the OpenCode session you already have, which reads the image
+  itself, once and narrowly:
+
+      opencode run --standalone -c "read tmp/evidence/{{.Ticket}}-what.png and say whether <the one visual thing the ticket asks for>; if it is wrong, fix it and say what you changed"
+
+  It takes a few seconds and comes back into the same session, so it knows the ticket. Run `make verify`
+  and commit again if it changed anything. Do not use `vision_analyze` for these: it spends a second
+  model call describing the whole image in text before you ever see it.
+- Never push, never merge anything other than your `Merge first` branches, never switch branches. You
+  have no GitHub access and need none.
+- Nobody is there to approve anything, and Hermes refuses whatever asks for approval. Never edit
+  AGENTS.md, CLAUDE.md or any other agent-instruction file: if your ticket seems to need a change there,
+  say so in your summary. Keep each command one plain command: write a file with write_file and commit
+  it with `git commit -F <file>` rather than wrapping it in `bash -c`, `sh -c`, `python -c` or a
+  heredoc, delete nothing recursively (temp files go away with the container), and start anything long
+  with `background=true` instead of a trailing `&`. A command that runs past five minutes in the
+  foreground loses its container at five minutes and comes back as exit 137: put it in the background
+  with its output in a file and read the file.
+- Finish with kanban_complete: a short summary that says what you changed and in which files, and
+  metadata with the keys verification (a list: each command you ran and its result), branch, commit
+  (the sha) and changed_files.
+- Do not use kanban_request_review. If the checks fail and you cannot fix them, call kanban_block with
+  kind "needs_input" and the failing output.

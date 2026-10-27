@@ -1,7 +1,7 @@
 // Command factory drives one factory run from the terminal. It is a thin main: the
 // work is in internal/factory, which the tests drive with fakes (README.md).
 //
-//	factory plan    --issue N [--dry-run] [--json]
+//	factory plan    --issue N [--worker pig|hermes|opencode] [--dry-run] [--json]
 //	factory clean   --issue N [--dry-run] [--json]
 //	factory publish --issue N [--dry-run] [--json]
 //	factory publish --hook [--dry-run] [--json]  < payload
@@ -97,6 +97,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	flags.StringVar(&overrides.Trees, "trees", "", "where the run's worktrees live")
 	flags.StringVar(&overrides.Board, "board", "", "the kanban board")
 	flags.StringVar(&overrides.Home, "gh-home", "", "HOME for the GitHub commands: the profile whose login can push")
+	flags.StringVar(&overrides.Worker, "worker", "", "plan: what a coder card hands its ticket to: pig (default), hermes or opencode")
 	if err := flags.Parse(args[1:]); err != nil {
 		return fmt.Errorf("%s\n\n%s", firstLine(parse.String()), usage)
 	}
@@ -241,6 +242,7 @@ func override(opts *factory.Options, flags factory.Options) {
 		{&opts.Trees, flags.Trees},
 		{&opts.Board, flags.Board},
 		{&opts.Home, flags.Home},
+		{&opts.Worker, flags.Worker},
 	} {
 		if field.from != "" {
 			*field.to = field.from
@@ -316,4 +318,5 @@ and comments from a process of its own, for the claimed hook.
 --dry-run prints what the phase would change and changes nothing. Run it inside the
 repository: the repository is origin's, the clone is the main checkout, the worktrees
 are <clone>-worktrees and the board is the repository's name. --repo, --clone, --trees,
---board and --gh-home override them. factory --version prints the release.`
+--board and --gh-home override them. plan --worker picks what the coder cards hand their
+tickets to; pig is the default. factory --version prints the release.`

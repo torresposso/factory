@@ -12,7 +12,8 @@ kanban cards and the finished branch into one pull request. Read `README.md` for
 
 - `make verify` — `gofmt`, `go vet`, `go test ./...`. Must exit 0 before a commit; CI runs the same.
 - `make build` — a local binary in `dist/`.
-- A release is a tag `vX.Y.Z` pushed to `main`: `.github/workflows/release.yml` builds `linux/amd64` and
+- A release is a tag `vX.Y.Z` pushed to `main`, after `main` is pushed and its Verify run is green (a tag on a
+  red commit publishes nothing and cannot be moved): `.github/workflows/release.yml` builds `linux/amd64` and
   `linux/arm64` and publishes them with `SHA256SUMS`.
 
 ## Tests

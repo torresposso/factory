@@ -14,9 +14,11 @@ func TestEveryRulesFileRenders(t *testing.T) {
 		t.Fatalf("reading the embedded rules: %v", err)
 	}
 	want := map[string]bool{
-		"coder-rules.txt":       false,
-		"integration-rules.txt": false,
-		"review-rules.txt":      false,
+		"coder-rules-pig.txt":      false,
+		"coder-rules-hermes.txt":   false,
+		"coder-rules-opencode.txt": false,
+		"integration-rules.txt":    false,
+		"review-rules.txt":         false,
 	}
 	for _, entry := range entries {
 		if _, ok := want[entry.Name()]; !ok {
@@ -59,7 +61,8 @@ func TestCoderCardBody(t *testing.T) {
 	)
 	plan := h.plan(t, 20)
 
-	body := cardByKey(t, plan, "code:22").Body(nil)
+	// The rules are wrapped for people to read: compare them with the line breaks folded.
+	body := strings.Join(strings.Fields(cardByKey(t, plan, "code:22").Body(nil)), " ")
 
 	for _, want := range []string{
 		"## Spec #20 (context only): Portfolio",
@@ -73,7 +76,7 @@ func TestCoderCardBody(t *testing.T) {
 		"## Coder rules",
 		"You do not write the code",
 		"tmp/pig-22.md",
-		"pig -p --no-session",
+		"pig -p --session-dir tmp/pig-sessions",
 		"/opt/opencode-skills/engineering/tdd/SKILL.md",
 		"background=true",
 		"chrome-devtools-axi run < tmp/look.js",
@@ -93,6 +96,37 @@ func TestCoderCardBody(t *testing.T) {
 	}
 	if strings.Contains(body, "Refs #20") {
 		t.Errorf("the coder card tells the coder to close the spec instead of its ticket:\n%s", body)
+	}
+}
+
+// The same tickets can be planned for another worker: only the part of the rules that
+// says who writes the code changes, and an unknown worker stops the plan before it
+// touches anything.
+func TestCoderCardFollowsTheWorker(t *testing.T) {
+	for worker, want := range map[string]string{
+		WorkerPig:      "pig -p --session-dir",
+		WorkerHermes:   "You write the code yourself",
+		WorkerOpenCode: "opencode run --standalone --title \"ticket 21\"",
+	} {
+		h := newHarness(t)
+		h.spec(20, "Portfolio", []Issue{open(21, "the list")}, map[int][]int{21: nil})
+		h.factory.Opts.Worker = worker
+		body := cardByKey(t, h.plan(t, 20), "code:21").Body(nil)
+		if !strings.Contains(body, want) {
+			t.Errorf("worker %s: the coder card does not contain %q:\n%s", worker, want, body)
+		}
+		for _, other := range []string{"pig -p", "opencode run --standalone --title"} {
+			if !strings.Contains(want, other) && strings.Contains(body, other) {
+				t.Errorf("worker %s: the coder card also names %q:\n%s", worker, other, body)
+			}
+		}
+	}
+
+	h := newHarness(t)
+	h.spec(20, "Portfolio", []Issue{open(21, "the list")}, map[int][]int{21: nil})
+	h.factory.Opts.Worker = "gpt"
+	if err := h.refused(t, 20); !strings.Contains(err.Error(), "unknown worker") {
+		t.Errorf("an unknown worker is refused with %v", err)
 	}
 }
 
@@ -246,7 +280,7 @@ func TestCardBodiesHaveNoRunsOfBlankLines(t *testing.T) {
 // name the Makefile contract (verify, preview, preview-stop) and nothing one repository has.
 func TestRulesNameOnlyTheMakefileContract(t *testing.T) {
 	data := rulesData{Repo: "torresposso/laiacaliente-app", Issue: 20, Ticket: 21, Branch: "factory/20-21"}
-	for _, name := range []string{"coder-rules.txt", "integration-rules.txt", "review-rules.txt"} {
+	for _, name := range []string{"coder-rules-pig.txt", "coder-rules-hermes.txt", "coder-rules-opencode.txt", "integration-rules.txt", "review-rules.txt"} {
 		rendered := rules(name, data)
 		for _, unwanted := range []string{"make css", "app.css", "pocketbase-bin", "internal/web", "PocketBase"} {
 			if strings.Contains(rendered, unwanted) {
@@ -260,7 +294,7 @@ func TestRulesNameOnlyTheMakefileContract(t *testing.T) {
 // writes Hermes asks a human about, so it never spends a turn on one.
 func TestRulesKeepTheWorkerOffApprovals(t *testing.T) {
 	data := rulesData{Repo: "torresposso/laiacaliente-app", Issue: 20, Ticket: 21, Branch: "factory/20-21"}
-	for _, name := range []string{"coder-rules.txt", "integration-rules.txt", "review-rules.txt"} {
+	for _, name := range []string{"coder-rules-pig.txt", "coder-rules-hermes.txt", "coder-rules-opencode.txt", "integration-rules.txt", "review-rules.txt"} {
 		rendered := rules(name, data)
 		for _, wanted := range []string{"agent-instruction file", "`bash -c`", "heredoc"} {
 			if !strings.Contains(rendered, wanted) {

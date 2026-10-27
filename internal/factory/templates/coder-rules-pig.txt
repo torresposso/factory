@@ -41,10 +41,11 @@
 
 - Then run PiG from your workspace, in the background, with `background=true`:
 
-      pig -p --no-session --skill /opt/opencode-skills/engineering/implement --skill /opt/opencode-skills/engineering/tdd "Do the ticket and the work order on stdin." < tmp/pig-{{.Ticket}}.md > tmp/pig-{{.Ticket}}.out 2> tmp/pig-{{.Ticket}}.log; echo $? > tmp/pig-{{.Ticket}}.exit
+      pig -p --session-dir tmp/pig-sessions --skill /opt/opencode-skills/engineering/implement --skill /opt/opencode-skills/engineering/tdd "Do the ticket and the work order on stdin." < tmp/pig-{{.Ticket}}.md > tmp/pig-{{.Ticket}}.out 2> tmp/pig-{{.Ticket}}.log; echo $? > tmp/pig-{{.Ticket}}.exit
 
-  The work order goes in on stdin, byte for byte, so no quoting mangles it. `.out` takes PiG's last
-  message, `.log` its diagnostics, and `.exit` appears when it ends, with its exit code. Wait for it
+  Run that command exactly as written, with no file around it. The work order goes in on stdin, byte for
+  byte, so no quoting mangles it. `.out` takes PiG's last message, `.log` its diagnostics, `tmp/pig-sessions/`
+  its whole session, and `.exit` appears when it ends, with its exit code. Wait for it
   with one command that returns the moment it ends, not with `sleep` calls of your own guessing:
 
       for i in $(seq 90); do [ -s tmp/pig-{{.Ticket}}.exit ] && break; sleep 3; done; cat tmp/pig-{{.Ticket}}.exit tmp/pig-{{.Ticket}}.out
