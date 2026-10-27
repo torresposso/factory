@@ -14,7 +14,8 @@
 
   `tmp/look.js` is a few lines of `await page.open("http://127.0.0.1:<your port>/...")`,
   `await page.fill("<css selector>", "...")`, `await page.click("<css selector>")` and
-  `await page.eval(() => document.body.innerText)`, and `run` prints what they return. Selectors work;
+  `console.log(await page.eval(() => document.body.innerText))`, and `run` prints only what the script
+  writes to stdout, so an `eval` without `console.log` prints nothing and a `return` is an error. Selectors work;
   a snapshot's `@refs` go stale the moment the page changes. Screenshot the viewport, not the whole
   page, and crop a long page to the part you care about.
 - Save the screenshots you take in `tmp/evidence/` of your workspace (at most 3, PNG, named

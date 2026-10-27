@@ -26,7 +26,9 @@
       `make preview PORT=<your port> DIR=tmp/preview-{{.Ticket}}` (output to tmp/preview-{{.Ticket}}.log),
       wait for the port, write `tmp/look.js` once with every page and step the ticket touches
       (`await page.open("http://127.0.0.1:<your port>/...")`, `await page.fill("<css selector>", "...")`,
-      `await page.click("<css selector>")`, `await page.eval(() => document.body.innerText)`), then run
+      `await page.click("<css selector>")`, `console.log(await page.eval(() => document.body.innerText))`: `run`
+      prints only what the script writes to stdout, so an `eval` without `console.log` prints nothing and
+      a `return` is an error), then run
       `chrome-devtools-axi run < tmp/look.js`, `chrome-devtools-axi screenshot
       tmp/evidence/{{.Ticket}}-what.png` (the viewport, not the whole page; at most 3 PNG in that folder,
       which is not committed) and `chrome-devtools-axi stop`. Read the screenshot yourself and say

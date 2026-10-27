@@ -77,6 +77,7 @@ func TestCoderCardBody(t *testing.T) {
 		"/opt/opencode-skills/engineering/tdd/SKILL.md",
 		"background=true",
 		"chrome-devtools-axi run < tmp/look.js",
+		"console.log(await page.eval(",
 		"tmp/evidence/22-what.png",
 		"[ -s tmp/pig-22.exit ]",
 		"Plan your commands before you run the first one",
@@ -211,6 +212,7 @@ func TestReviewCardBody(t *testing.T) {
 		"## Review rules",
 		"code-review skill",
 		"read tmp/evidence/review-what.png",
+		"console.log(await page.eval(",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the review card does not contain %q:\n%s", want, body)

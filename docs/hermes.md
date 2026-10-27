@@ -138,7 +138,7 @@ and 0.22.5 is still the newest stable release.
   the main container, where a card's preview — a port inside the card's own sandbox — does not exist.
   Cards look with `chrome-devtools-axi` inside their sandbox: `run` with a script (`page.open`,
   `page.fill`, `page.click`, `page.eval`) prints what it finds, and `screenshot` saves the image;
-  selectors survive a page change, a snapshot's `@refs` do not.
+  selectors survive a page change, a snapshot's `@refs` do not. `run` returns only what the script writes to stdout (probed 2026-10-26 in a sandbox-like container: Chrome starts in 3.6 s cold and 1.2 s warm, a screenshot takes 0.2 s): an `eval` without `console.log` prints nothing and a top-level `return` fails with `Illegal return statement`. The rules said the opposite until v0.4.1, which is why cards wrote three or four `look.js` per ticket.
 - The dashboard shows a running card as `Session: local-…` and nothing else. The transcript is in the
   profile's state database: `/opt/data/profiles/<profile>/state.db`, table `messages`, one row per turn
   with its `tool_name` and `tool_calls`. Read it with `sqlite3` in read-only mode; the card's own log
