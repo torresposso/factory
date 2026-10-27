@@ -21,7 +21,7 @@
 - Save the screenshots you take in `tmp/evidence/` of your workspace (at most 3, PNG, named
   `review-what.png`). If a preview data directory you want already exists, use another name instead of
   removing it.
-- Then look at the screenshot with `vision_analyze`, once and narrowly: pass the image path and one question
+- Then look at the screenshot with `vision_analyze`, once and narrowly: pass `tmp/evidence/review-what.png` and one question
   about the one visual thing the spec asks for, not "describe the page". Do not look at the tickets' images
   in `tmp/evidence/`: they are for the pull request.
 - Fix what it finds as new commits on the branch, then run `make verify` from the repo root. Do not

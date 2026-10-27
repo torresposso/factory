@@ -209,7 +209,8 @@ func TestReviewCardBody(t *testing.T) {
 		"Preview port: 8102",
 		"## Review rules",
 		"code-review skill",
-		"read tmp/evidence/review-what.png",
+		"vision_analyze",
+		"tmp/evidence/review-what.png",
 		"console.log(await page.eval(",
 	} {
 		if !strings.Contains(body, want) {
