@@ -115,6 +115,18 @@ and 0.22.5 is still the newest stable release.
   and `qa`, set `terminal.docker_env.XDG_CONFIG_HOME` to the mounted cache's `opencode/config` and
   forward `OPENCODE_GO_API_KEY` by name; a profile without the pair gets OpenCode's default model
   (`big-pickle`), which cannot read an image (probed 2026-10-26: `CANNOT SEE`).
+- Since v0.4.0 a coder card hands the whole ticket to PiG (`pig` 0.5.3, a Go port of the Pi agent harness,
+  `github.com/MichaelKinsy/PiG`, MIT; the image carries its official `linux-arm64` tarball pinned by version
+  and sha256) and checks what it left; OpenCode stays installed for the review card's look at a screenshot.
+  Probed on Basecamp on 2026-10-26 with `deepseek-v4.1-flash` through `opencode-go`: `pig -p` takes the
+  prompt on stdin, `pig --mode json` prints the events with `durationMs` per tool, and PiG knows
+  `opencode-go` and the key from `OPENCODE_GO_API_KEY` without a `models.json`. A pure-function ticket took
+  100 s (OpenCode: 72 s on the same ticket in another prompt); a page ticket, done end to end by PiG alone
+  (code, `make verify`, preview, screenshot, reading the screenshot, commit), took 255 s against 496 s as a
+  Hermes card with OpenCode. PiG reads an image with its own `read` tool, as a user message, so
+  `vision_analyze` is not involved. The coder profile sets `PIG_HOME` to the mounted cache's `pig`
+  directory, whose `agent/settings.json` holds `defaultProvider` and `defaultModel`, and `PIG_OFFLINE=1`
+  (no update check, no catalog refresh). Not measured yet on a whole spec.
 - A foreground terminal command has five minutes. `terminal.lifetime_seconds` is 300 and
   `_cleanup_inactive_envs` recycles any sandbox that has no background process of its own, so a command
   still running at 300 s gets its container stopped and returns `exit 137`
