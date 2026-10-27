@@ -786,7 +786,7 @@ func TestGitCommandsUseTheBase(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"git -C /clone pull --ff-only origin staging",
+		"git -C /clone fetch origin staging",
 		"git -C /clone worktree add -b factory/20 /trees/20 origin/staging",
 		"git -C /clone diff --numstat origin/staging...factory/20",
 	}

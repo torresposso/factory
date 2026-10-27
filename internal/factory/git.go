@@ -68,6 +68,12 @@ func (g *CLIGit) base() string {
 }
 
 func (g *CLIGit) Pull(ctx context.Context) error {
+	// The clone has main checked out. Another base is only fetched: pulling it would
+	// try to fast-forward main to it, and fail as soon as the two diverge.
+	if g.base() != DefaultBase {
+		_, err := g.commands.run(ctx, g.pushEnv(), "", "git", "-C", g.Clone, "fetch", "origin", g.base())
+		return err
+	}
 	_, err := g.commands.run(ctx, g.pushEnv(), "", "git", "-C", g.Clone, "pull", "--ff-only", "origin", g.base())
 	return err
 }

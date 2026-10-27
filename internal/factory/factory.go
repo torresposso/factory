@@ -236,7 +236,14 @@ type LabelStep struct {
 }
 
 func (s PullStep) String() string {
-	return "update the base checkout (git pull --ff-only origin " + s.Base + ")"
+	base := s.Base
+	if base == "" {
+		base = DefaultBase
+	}
+	if base != DefaultBase {
+		return "update the base branch (git fetch origin " + base + ")"
+	}
+	return "update the base checkout (git pull --ff-only origin " + base + ")"
 }
 
 func (s AddWorktreeStep) String() string { return "worktree " + s.Branch + " at " + s.Path }

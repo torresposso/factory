@@ -572,7 +572,7 @@ func TestPublishTargetsTheConfiguredBase(t *testing.T) {
 	if !strings.Contains(pr.PullRequest.Body, "against `staging`") {
 		t.Errorf("the body does not say it is against staging:\n%s", pr.PullRequest.Body)
 	}
-	if got := (PullStep{Base: "staging"}).String(); !strings.Contains(got, "origin staging") {
+	if got := (PullStep{Base: "staging"}).String(); !strings.Contains(got, "fetch origin staging") {
 		t.Errorf("pull step = %q", got)
 	}
 }
