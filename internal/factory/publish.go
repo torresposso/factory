@@ -82,7 +82,7 @@ func (f *Factory) Publish(ctx context.Context, issue int) (*Plan, error) {
 		return nil, err
 	}
 	if len(diff.Files) == 0 {
-		return nil, fmt.Errorf("%s has no commits of its own against origin/main: there is nothing to publish", branch(issue))
+		return nil, fmt.Errorf("%s has no commits of its own against origin/%s: there is nothing to publish", branch(issue), f.Opts.baseBranch())
 	}
 
 	reported, err := f.reportCards(ctx, mine)
@@ -103,7 +103,7 @@ func (f *Factory) Publish(ctx context.Context, issue int) (*Plan, error) {
 	steps = append(steps,
 		PushStep{Branch: branch(issue)},
 		OpenPullRequestStep{PullRequest: NewPullRequest{
-			Base:      "main",
+			Base:      f.Opts.baseBranch(),
 			Head:      branch(issue),
 			Title:     pullRequestTitle(run.Spec.Title),
 			Body:      f.pullRequestBody(run, reported, images, gate, diff),
@@ -344,7 +344,7 @@ func (f *Factory) pullRequestBody(run PlannedRun, cards []runCard, images []Evid
 	parts := []string{strings.Join(closes, "\n")}
 	parts = append(parts, section("Summary", f.summaryBody(run, cards)))
 	parts = append(parts, section("Evidence", f.evidenceBody(run, cards, images, gate)))
-	parts = append(parts, section("Merge danger", mergeDangerBody(diff)))
+	parts = append(parts, section("Merge danger", mergeDangerBody(diff, f.Opts.baseBranch())))
 	return cardBody(parts...)
 }
 
@@ -435,9 +435,9 @@ func verified(card runCard, last bool) string {
 // mergeDangerBody is what a reader has to know before merging: how big the change is,
 // and whether it touches a path that deploys, migrates or is otherwise not undone by
 // the revert alone.
-func mergeDangerBody(diff Diff) string {
+func mergeDangerBody(diff Diff, base string) string {
 	danger := riskyPaths(diff.Files)
-	lines := []string{fmt.Sprintf("%d file(s), +%d/-%d against `main`.", len(diff.Files), diff.Insertions, diff.Deletions)}
+	lines := []string{fmt.Sprintf("%d file(s), +%d/-%d against `%s`.", len(diff.Files), diff.Insertions, diff.Deletions, base)}
 	if len(danger) > 0 {
 		lines = append(lines, fmt.Sprintf("Touches %s: %s.",
 			strings.Join(danger, ", "),

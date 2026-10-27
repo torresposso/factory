@@ -29,6 +29,10 @@ type Options struct {
 	// Board is the kanban board. Never the current board: that file is shared by
 	// every profile, and the factory always names the board it means.
 	Board string
+	// Base is the branch a run starts from and its pull request targets: `main`
+	// unless the clone's git config says otherwise (`git config factory.base staging`),
+	// so a repository whose work is tried on another branch first says so once.
+	Base string
 	// Home is HOME for the commands that talk to GitHub. The hermes user's default
 	// HOME carries no gh login; the publisher profile's does.
 	Home string
@@ -71,7 +75,22 @@ func detectOptions(ctx context.Context, commands runner, dir string) (Options, e
 	opts.Clone = filepath.Dir(strings.TrimSpace(common))
 	opts.Trees = opts.Clone + "-worktrees"
 	opts.Board = boardOf(opts.Repo)
+	// An unset key is not an error: git config exits 1 and the base stays main.
+	if base, err := commands.run(ctx, nil, "", "git", "-C", opts.Clone, "config", "--get", "factory.base"); err == nil {
+		opts.Base = strings.TrimSpace(base)
+	}
 	return opts, nil
+}
+
+// DefaultBase is the branch a repository that sets none starts from.
+const DefaultBase = "main"
+
+// baseBranch is the branch the run starts from and its pull request targets.
+func (o Options) baseBranch() string {
+	if o.Base == "" {
+		return DefaultBase
+	}
+	return o.Base
 }
 
 // repoOf reads owner/name from a GitHub remote, in any of the shapes git accepts:
@@ -126,7 +145,7 @@ type Factory struct {
 func New(opts Options) *Factory {
 	commands := shell{}
 	return &Factory{
-		Git:        &CLIGit{Clone: opts.Clone, Home: opts.Home, commands: commands},
+		Git:        &CLIGit{Clone: opts.Clone, Home: opts.Home, Base: opts.Base, commands: commands},
 		GitHub:     &CLIGitHub{Repo: opts.Repo, Home: opts.Home, commands: commands},
 		Board:      &CLIBoard{Board: opts.Board, commands: commands},
 		Workspaces: WorktreeFiles{},
@@ -147,10 +166,10 @@ type Plan struct {
 // Step is one change. String() is the line the operator reads; Apply runs it.
 type Step interface{ String() string }
 
-// PullStep brings the base checkout up to date with origin/main.
-type PullStep struct{}
+// PullStep brings the base checkout up to date with origin/<Base>.
+type PullStep struct{ Base string }
 
-// AddWorktreeStep creates a worktree holding a new branch off origin/main.
+// AddWorktreeStep creates a worktree holding a new branch off the base branch.
 type AddWorktreeStep struct{ Branch, Path string }
 
 // RemoveWorktreeStep removes a worktree, with the local branch that is checked out
@@ -216,7 +235,9 @@ type LabelStep struct {
 	Add, Remove []string
 }
 
-func (PullStep) String() string { return "update the base checkout (git pull --ff-only origin main)" }
+func (s PullStep) String() string {
+	return "update the base checkout (git pull --ff-only origin " + s.Base + ")"
+}
 
 func (s AddWorktreeStep) String() string { return "worktree " + s.Branch + " at " + s.Path }
 

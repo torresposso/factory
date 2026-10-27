@@ -96,6 +96,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	flags.StringVar(&overrides.Clone, "clone", "", "the base checkout the worktrees come from")
 	flags.StringVar(&overrides.Trees, "trees", "", "where the run's worktrees live")
 	flags.StringVar(&overrides.Board, "board", "", "the kanban board")
+	flags.StringVar(&overrides.Base, "base", "", "the branch runs start from and pull requests target (default: git config factory.base, else main)")
 	flags.StringVar(&overrides.Home, "gh-home", "", "HOME for the GitHub commands: the profile whose login can push")
 	flags.IntVar(&overrides.GoalTurns, "goal-turns", 0, "plan: run each ticket's coder card in goal mode, at most N turns")
 	flags.StringVar(&overrides.CoderModel, "coder-model", "", "plan: the model the ticket cards run on")
@@ -242,6 +243,7 @@ func override(opts *factory.Options, flags factory.Options) {
 		{&opts.Clone, flags.Clone},
 		{&opts.Trees, flags.Trees},
 		{&opts.Board, flags.Board},
+		{&opts.Base, flags.Base},
 		{&opts.Home, flags.Home},
 	} {
 		if field.from != "" {
@@ -321,5 +323,6 @@ and comments from a process of its own, for the claimed hook.
 
 --dry-run prints what the phase would change and changes nothing. Run it inside the
 repository: the repository is origin's, the clone is the main checkout, the worktrees
-are <clone>-worktrees and the board is the repository's name. --repo, --clone, --trees,
---board and --gh-home override them. factory --version prints the release.`
+are <clone>-worktrees, the board is the repository's name and the base branch is the
+clone's git config factory.base (main when unset). --repo, --clone, --trees, --board,
+--base and --gh-home override them. factory --version prints the release.`

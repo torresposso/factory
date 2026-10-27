@@ -115,7 +115,7 @@ func (f *Factory) guards(ctx context.Context, issue int, cards []BoardCard) erro
 // steps is the plan itself: the base checkout, the leftovers of earlier runs, this
 // issue's own leftovers, the worktrees, and the cards.
 func (f *Factory) steps(ctx context.Context, run PlannedRun, issue int, worktrees []Worktree, cards []BoardCard) ([]Step, error) {
-	steps := []Step{PullStep{}}
+	steps := []Step{PullStep{Base: f.Opts.baseBranch()}}
 
 	// Runs whose pull request is closed are done with: their folders and branches go,
 	// whatever they left behind.

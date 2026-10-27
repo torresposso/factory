@@ -734,3 +734,65 @@ func TestDetectOptionsFromAWorktree(t *testing.T) {
 		t.Errorf("the clone is read with %q", got)
 	}
 }
+
+// A repository whose work is tried on another branch first says so in the clone's git
+// config, once; every worktree of the clone shares it.
+func TestDetectOptionsReadsTheBaseFromGitConfig(t *testing.T) {
+	tools := &recorder{replies: []reply{
+		{match: []string{"git", "-C", "/repos/voxpopuli-digital", "remote"}, out: "git@github.com:torresposso/voxpopuli-digital.git\n"},
+		{match: []string{"git", "-C", "/repos/voxpopuli-digital", "rev-parse"}, out: "/repos/voxpopuli-digital/.git\n"},
+		{match: []string{"git", "-C", "/repos/voxpopuli-digital", "config"}, out: "staging\n"},
+	}}
+	opts, err := detectOptions(context.Background(), tools, "/repos/voxpopuli-digital")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.Base != "staging" || opts.baseBranch() != "staging" {
+		t.Errorf("base = %q; want staging", opts.Base)
+	}
+	last := tools.calls[len(tools.calls)-1]
+	if got := command(last); got != "git -C /repos/voxpopuli-digital config --get factory.base" {
+		t.Errorf("the base is read with %q", got)
+	}
+}
+
+// An unset key makes git config fail, and that is not an error: the base stays main.
+func TestDetectOptionsWithoutABaseKeepsMain(t *testing.T) {
+	tools := &recorder{replies: []reply{
+		{match: []string{"git", "-C", "/repos/a", "remote"}, out: "git@github.com:o/a.git\n"},
+		{match: []string{"git", "-C", "/repos/a", "rev-parse"}, out: "/repos/a/.git\n"},
+		{match: []string{"git", "-C", "/repos/a", "config"}, err: errors.New("exit status 1")},
+	}}
+	opts, err := detectOptions(context.Background(), tools, "/repos/a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.Base != "" || opts.baseBranch() != "main" {
+		t.Errorf("base = %q (%q); want main", opts.Base, opts.baseBranch())
+	}
+}
+
+func TestGitCommandsUseTheBase(t *testing.T) {
+	tools := &recorder{replies: []reply{{match: []string{"git", "-C", "/clone", "diff"}, out: numstat}}}
+	git := &CLIGit{Clone: "/clone", Base: "staging", commands: tools}
+	ctx := context.Background()
+	if err := git.Pull(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := git.AddWorktree(ctx, "factory/20", "/trees/20"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := git.Diff(ctx, "factory/20"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"git -C /clone pull --ff-only origin staging",
+		"git -C /clone worktree add -b factory/20 /trees/20 origin/staging",
+		"git -C /clone diff --numstat origin/staging...factory/20",
+	}
+	for index, call := range tools.calls {
+		if got := command(call); got != want[index] {
+			t.Errorf("call %d = %q; want %q", index, got, want[index])
+		}
+	}
+}

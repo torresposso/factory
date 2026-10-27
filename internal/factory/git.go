@@ -13,9 +13,9 @@ import (
 // Git is the clone the run works in. The factory never touches the base checkout's
 // working tree: it only adds and removes worktrees of it, and pushes branches.
 type Git interface {
-	// Pull brings the clone's main up to date with origin/main.
+	// Pull brings the clone's base branch up to date with origin.
 	Pull(ctx context.Context) error
-	// AddWorktree creates a worktree at path holding a new branch off origin/main.
+	// AddWorktree creates a worktree at path holding a new branch off the base branch.
 	AddWorktree(ctx context.Context, branch, path string) error
 	// RemoveWorktree removes the worktree at path (--force).
 	RemoveWorktree(ctx context.Context, path string) error
@@ -25,7 +25,7 @@ type Git interface {
 	Worktrees(ctx context.Context) ([]Worktree, error)
 	// Push pushes a branch of the clone to origin.
 	Push(ctx context.Context, branch string) error
-	// Diff reads what a branch changes against origin/main.
+	// Diff reads what a branch changes against the base branch.
 	Diff(ctx context.Context, branch string) (Diff, error)
 	// PublishEvidence pushes files to ref, from a throwaway repository, so a branch
 	// that is never merged can carry them.
@@ -53,18 +53,27 @@ type Diff struct {
 // through the gh credential helper, and only the publisher profile's home carries that
 // login. Every other command runs with the environment the factory was started with.
 type CLIGit struct {
-	Clone    string
-	Home     string
+	Clone string
+	Home  string
+	// Base is the branch runs start from and publish against; empty means main.
+	Base     string
 	commands runner
 }
 
+func (g *CLIGit) base() string {
+	if g.Base == "" {
+		return DefaultBase
+	}
+	return g.Base
+}
+
 func (g *CLIGit) Pull(ctx context.Context) error {
-	_, err := g.commands.run(ctx, g.pushEnv(), "", "git", "-C", g.Clone, "pull", "--ff-only", "origin", "main")
+	_, err := g.commands.run(ctx, g.pushEnv(), "", "git", "-C", g.Clone, "pull", "--ff-only", "origin", g.base())
 	return err
 }
 
 func (g *CLIGit) AddWorktree(ctx context.Context, branch, path string) error {
-	_, err := g.commands.run(ctx, nil, "", "git", "-C", g.Clone, "worktree", "add", "-b", branch, path, "origin/main")
+	_, err := g.commands.run(ctx, nil, "", "git", "-C", g.Clone, "worktree", "add", "-b", branch, path, "origin/"+g.base())
 	return err
 }
 
@@ -92,9 +101,9 @@ func (g *CLIGit) Push(ctx context.Context, branch string) error {
 }
 
 func (g *CLIGit) Diff(ctx context.Context, branch string) (Diff, error) {
-	// The three dots compare against the branch point, so a merge of main into the
+	// The three dots compare against the branch point, so a merge of the base into the
 	// branch does not show up as a change of its own.
-	out, err := g.commands.run(ctx, nil, "", "git", "-C", g.Clone, "diff", "--numstat", "origin/main..."+branch)
+	out, err := g.commands.run(ctx, nil, "", "git", "-C", g.Clone, "diff", "--numstat", "origin/"+g.base()+"..."+branch)
 	if err != nil {
 		return Diff{}, err
 	}

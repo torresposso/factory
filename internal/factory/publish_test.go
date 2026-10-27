@@ -438,7 +438,7 @@ func TestMergeDangerNamesTheRiskyPaths(t *testing.T) {
 }
 
 func TestMergeDangerNamesThePocketBaseImage(t *testing.T) {
-	got := mergeDangerBody(Diff{Files: []string{"pocketbase/Dockerfile"}, Insertions: 2, Deletions: 2})
+	got := mergeDangerBody(Diff{Files: []string{"pocketbase/Dockerfile"}, Insertions: 2, Deletions: 2}, "main")
 
 	if !strings.Contains(got, "the production image") || !strings.Contains(got, "`pocketbase/Dockerfile`") {
 		t.Errorf("merge danger = %q", got)
@@ -474,7 +474,7 @@ func TestMergeDangerPatternsAreTheStacks(t *testing.T) {
 func TestMergeDangerOfAnOrdinaryChange(t *testing.T) {
 	diff := Diff{Files: []string{"internal/web/home.templ"}, Insertions: 3, Deletions: 1}
 
-	got := mergeDangerBody(diff)
+	got := mergeDangerBody(diff, "main")
 
 	if !strings.Contains(got, "Nothing here changes the image") || !strings.Contains(got, "Undoing it is reverting the merge.") {
 		t.Errorf("merge danger = %q", got)
@@ -548,5 +548,31 @@ func TestPullRequestTitleDropsTheSpecMark(t *testing.T) {
 		if got := pullRequestTitle(spec); got != want {
 			t.Errorf("pullRequestTitle(%q) = %q; want %q", spec, got, want)
 		}
+	}
+}
+
+// The pull request goes to the repository's base branch, and says so in its danger line.
+func TestPublishTargetsTheConfiguredBase(t *testing.T) {
+	h := publishHarness(t)
+	h.factory.Opts.Base = "staging"
+
+	plan, err := h.factory.Publish(context.Background(), 20)
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	var pr OpenPullRequestStep
+	for _, step := range plan.Steps {
+		if open, ok := step.(OpenPullRequestStep); ok {
+			pr = open
+		}
+	}
+	if pr.PullRequest.Base != "staging" {
+		t.Errorf("base = %q; want staging", pr.PullRequest.Base)
+	}
+	if !strings.Contains(pr.PullRequest.Body, "against `staging`") {
+		t.Errorf("the body does not say it is against staging:\n%s", pr.PullRequest.Body)
+	}
+	if got := (PullStep{Base: "staging"}).String(); !strings.Contains(got, "origin staging") {
+		t.Errorf("pull step = %q", got)
 	}
 }

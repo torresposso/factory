@@ -1,6 +1,6 @@
 ## Integration rules
 
-- You add no feature. Your workspace is the branch `{{.Branch}}`, which starts as main. Your job is to
+- You add no feature. Your workspace is the branch `{{.Branch}}`, which starts as {{.Base}}. Your job is to
   bring every ticket's branch into it and leave it passing.
 - Take the tickets in the order listed. For each one: `git merge --no-ff --no-edit <its branch>`. A
   branch that is already contained merges as "Already up to date"; that is fine.

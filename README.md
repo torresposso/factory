@@ -66,6 +66,21 @@ the worktrees are `<clone>-worktrees`, and the board is the repository's name as
 (`torresposso.site` is `torresposso-site`). `--repo`, `--clone`, `--trees` and `--board` override them;
 `--gh-home` names the `HOME` whose `gh` login can push.
 
+## The base branch
+
+A run starts from `main` and its pull request targets `main`. A repository whose work is tried on
+another branch first (a `staging` environment that deploys from it, and a person who merges that
+branch into `main` once it is right) says so once, in the clone's git config, where the hooks and every
+worktree of the clone read it too:
+
+```sh
+git -C ~/repos/voxpopuli-digital config factory.base staging
+```
+
+`plan` then updates and branches from `origin/staging`, the review compares against it and `publish`
+opens the pull request against it. `--base` overrides the config for one command. With neither, the
+base is `main`, as before.
+
 ## The phases
 
 - `plan` reads the issue's open sub-issues and their open `blocked_by`, orders the tickets (blockers

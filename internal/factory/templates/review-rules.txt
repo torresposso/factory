@@ -1,6 +1,6 @@
 ## Review rules
 
-- Review the whole branch `{{.Branch}}` against main with the code-review skill: the standards, and
+- Review the whole branch `{{.Branch}}` against {{.Base}} with the code-review skill: the standards, and
   whether it does what the spec asks.
 - You did not write this branch. Run the checks yourself, and look at the page yourself when the
   change is visual, serving the preview on your `Preview port` instead of the port AGENTS.md names:

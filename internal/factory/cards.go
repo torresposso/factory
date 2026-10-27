@@ -32,6 +32,8 @@ type rulesData struct {
 	Ticket int
 	// Branch is the branch the card works on.
 	Branch string
+	// Base is the branch the run starts from and its pull request targets.
+	Base string
 }
 
 // rules renders one embedded rules file.
@@ -80,6 +82,7 @@ func (f *Factory) coderBody(run PlannedRun, ticket Ticket, branch string) string
 		Issue:  issue,
 		Ticket: ticket.Issue.Number,
 		Branch: branch,
+		Base:   f.Opts.baseBranch(),
 	}))
 	return cardBody(parts...)
 }
@@ -106,7 +109,7 @@ func (f *Factory) integrationBody(run PlannedRun, ids map[string]string) string 
 			[]string{"Branch: " + branch},
 			append(listed, fmt.Sprintf("Preview port: %d", run.Ports[issue]))...,
 		), "\n")),
-		rules("integration-rules.txt", rulesData{Repo: f.Opts.Repo, Issue: issue, Branch: branch}),
+		rules("integration-rules.txt", rulesData{Repo: f.Opts.Repo, Issue: issue, Branch: branch, Base: f.Opts.baseBranch()}),
 	)
 }
 
@@ -125,7 +128,7 @@ func (f *Factory) reviewBody(run PlannedRun) string {
 	branch := branch(issue)
 	parts = append(parts,
 		section("Your run", fmt.Sprintf("Branch: %s\nPreview port: %d", branch, run.Ports[issue])),
-		rules("review-rules.txt", rulesData{Repo: f.Opts.Repo, Issue: issue, Branch: branch}),
+		rules("review-rules.txt", rulesData{Repo: f.Opts.Repo, Issue: issue, Branch: branch, Base: f.Opts.baseBranch()}),
 	)
 	return cardBody(parts...)
 }
