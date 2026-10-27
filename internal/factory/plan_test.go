@@ -77,6 +77,23 @@ func TestPlanOfALoneTicket(t *testing.T) {
 
 }
 
+// Goal turns and a coder model reach the ticket's coder card and nothing else.
+func TestPlanGoalAndModelOnlyReachTheCoderCard(t *testing.T) {
+	h := newHarness(t)
+	h.factory.Opts.GoalTurns = 4
+	h.factory.Opts.CoderModel = "some-model"
+	h.lone(7, "The mobile menu")
+
+	plan := h.plan(t, 7)
+
+	if card := cardByKey(t, plan, "code:7").Card; card.GoalTurns != 4 || card.Model != "some-model" {
+		t.Errorf("coder card = %+v; want goal turns 4 and the model", card)
+	}
+	if card := cardByKey(t, plan, "review").Card; card.GoalTurns != 0 || card.Model != "" {
+		t.Errorf("review card = %+v; want neither", card)
+	}
+}
+
 // Several tickets get a worktree each, on their own branch, plus the one where the
 // branches meet; the cards follow the order: blockers first.
 func TestPlanOfSeveralTickets(t *testing.T) {

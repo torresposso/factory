@@ -50,6 +50,10 @@ type NewCard struct {
 	Workspace      string
 	MaxRuntime     int
 	IdempotencyKey string
+	// GoalTurns above zero runs the card in goal mode, for at most that many turns.
+	GoalTurns int
+	// Model overrides the assignee profile's model for this card.
+	Model string
 }
 
 // BoardCard is one card of the board, as far as the factory cares.
@@ -202,6 +206,12 @@ func (b *CLIBoard) Create(ctx context.Context, card NewCard, parents []string) (
 	}
 	for _, skill := range card.Skills {
 		args = append(args, "--skill", skill)
+	}
+	if card.GoalTurns > 0 {
+		args = append(args, "--goal", "--goal-max-turns", strconv.Itoa(card.GoalTurns))
+	}
+	if card.Model != "" {
+		args = append(args, "--model", card.Model)
 	}
 	args = append(args, "--json")
 

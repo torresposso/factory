@@ -283,6 +283,8 @@ func (f *Factory) ticketCards(run PlannedRun, issue int) []Step {
 				Workspace:      workspace,
 				MaxRuntime:     runtimeCoder,
 				IdempotencyKey: idempotencyKey(f.Opts.Board, issue, fmt.Sprintf("code:%d", number)),
+				GoalTurns:      f.Opts.GoalTurns,
+				Model:          f.Opts.CoderModel,
 			},
 			Parents: parents,
 			Body: func(map[string]string) string {

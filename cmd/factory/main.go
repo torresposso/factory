@@ -97,6 +97,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	flags.StringVar(&overrides.Trees, "trees", "", "where the run's worktrees live")
 	flags.StringVar(&overrides.Board, "board", "", "the kanban board")
 	flags.StringVar(&overrides.Home, "gh-home", "", "HOME for the GitHub commands: the profile whose login can push")
+	flags.IntVar(&overrides.GoalTurns, "goal-turns", 0, "plan: run each ticket's coder card in goal mode, at most N turns")
+	flags.StringVar(&overrides.CoderModel, "coder-model", "", "plan: the model the ticket cards run on")
 	if err := flags.Parse(args[1:]); err != nil {
 		return fmt.Errorf("%s\n\n%s", firstLine(parse.String()), usage)
 	}
@@ -246,6 +248,10 @@ func override(opts *factory.Options, flags factory.Options) {
 			*field.to = field.from
 		}
 	}
+	opts.GoalTurns = flags.GoalTurns
+	if flags.CoderModel != "" {
+		opts.CoderModel = flags.CoderModel
+	}
 }
 
 // startDetached runs the same command again, without --detach, in a session of its own,
@@ -297,7 +303,7 @@ func firstLine(text string) string {
 	return text
 }
 
-const usage = `factory plan    --issue N [--dry-run] [--json]
+const usage = `factory plan    --issue N [--dry-run] [--json] [--goal-turns N] [--coder-model M]
 factory clean   --issue N [--dry-run] [--json]
 factory publish --issue N [--dry-run] [--json]
 factory publish --hook [--dry-run] [--json]  < payload

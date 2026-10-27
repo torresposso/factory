@@ -32,6 +32,12 @@ type Options struct {
 	// Home is HOME for the commands that talk to GitHub. The hermes user's default
 	// HOME carries no gh login; the publisher profile's does.
 	Home string
+	// GoalTurns, when above zero, puts each ticket's coder card in goal mode with that
+	// many turns at most: the worker iterates until the ticket's checks pass.
+	GoalTurns int
+	// CoderModel, when set, is the model the ticket cards run on instead of the
+	// coder profile's own.
+	CoderModel string
 }
 
 // DefaultHome is the publisher profile's home in Basecamp's container, whose gh login is
