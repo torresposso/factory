@@ -5,7 +5,7 @@ finished branch into one pull request a person merges. The mechanical part — r
 ordering them, making the worktrees, creating the cards and publishing the branch — is this program. The models only write code and review it.
 
 ```
-factory plan    --issue N [--worker pig|hermes|opencode] [--dry-run] [--json]
+factory plan    --issue N [--dry-run] [--json]
 factory clean   --issue N [--dry-run] [--json]
 factory publish --issue N [--dry-run] [--json]
 factory publish --hook [--dry-run] [--json]  < payload

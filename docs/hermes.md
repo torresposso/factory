@@ -99,7 +99,8 @@ and 0.22.5 is still the newest stable release.
   therefore hand screenshots to OpenCode now — `-c` on a coder, a fresh call on the reviewer — and
   `vision_analyze` stays for the rest of Hermes. Integrate still does not look at the tickets' images.
   `region` crops the original before the downscale, so it is for reading a detail, not for speed.
-- A card writes its code through OpenCode 2.1.4, which the image carries (npm package `@opencode/cli-linux-arm64`,
+- OpenCode 2.1.4 is in the image only to read a screenshot (a card's own model never sees an image), and for the
+  skills; a card writes its own code. The image carries OpenCode (npm package `@opencode/cli-linux-arm64`,
   pinned by version and sha256) with Matt Pocock's 38 skills baked in at `/opt/opencode-skills` (pinned by
   commit and tarball sha256; `github.com/mattpocock/skills`). The cards' `opencode.json`, which lives in the
   mounted cache (`~/.cache/factory-go/opencode/config/opencode/`), adds that path under `skills` and sets the
@@ -115,24 +116,16 @@ and 0.22.5 is still the newest stable release.
   and `qa`, set `terminal.docker_env.XDG_CONFIG_HOME` to the mounted cache's `opencode/config` and
   forward `OPENCODE_GO_API_KEY` by name; a profile without the pair gets OpenCode's default model
   (`big-pickle`), which cannot read an image (probed 2026-10-26: `CANNOT SEE`).
-- Since v0.4.0 a coder card hands the whole ticket to PiG (`pig` 0.5.3, a Go port of the Pi agent harness,
-  `github.com/MichaelKinsy/PiG`, MIT; the image carries its official `linux-arm64` tarball pinned by version
-  and sha256) and checks what it left; OpenCode stays installed for the review card's look at a screenshot.
-  Probed on Basecamp on 2026-10-26 with `deepseek-v4.1-flash` through `opencode-go`: `pig -p` takes the
-  prompt on stdin, `pig --mode json` prints the events with `durationMs` per tool, and PiG knows
-  `opencode-go` and the key from `OPENCODE_GO_API_KEY` without a `models.json`. A pure-function ticket took
-  100 s (OpenCode: 72 s on the same ticket in another prompt); a page ticket, done end to end by PiG alone
-  (code, `make verify`, preview, screenshot, reading the screenshot, commit), took 255 s against 496 s as a
-  Hermes card with OpenCode. PiG reads an image with its own `read` tool, as a user message, so
-  `vision_analyze` is not involved. The coder profile sets `PIG_HOME` to the mounted cache's `pig`
-  directory, whose `agent/settings.json` holds `defaultProvider` and `defaultModel`, and `PIG_OFFLINE=1`
-  (no update check, no catalog refresh). The first whole spec with it (factory-sandbox #79, 1208 s) is not
-  comparable with the earlier ones (#64, #69, #74), which were other tickets.
-- Since v0.4.2 `factory plan --worker pig|hermes|opencode` picks what the coder cards hand their ticket to
-  (`coder-rules-<worker>.txt`; `pig` is the default), so the same tickets can be run once per worker: `hermes`
-  has the card's own model write the code, `opencode` is the v0.3.10 rules. PiG's whole session is kept in
-  the card's `tmp/pig-sessions/`, to read where its time went. Compare workers only on the same tickets,
-  one run at a time (two cores), and more than once: the same pure-function ticket took 100 s and 371 s.
+- Who writes the code in a coder card was measured on 2026-10-27 with the same tickets: spec #79 (the reading
+  time of a Nota: a function, the list, the page) copied six times in factory-sandbox, one run at a time, the
+  copies' ticket texts hashing the same, each branched from the same `main` (`d7433f0`). The order was PiG,
+  Hermes alone, OpenCode, OpenCode, Hermes alone, PiG. The three ticket cards together took 398 s and 520 s
+  with Hermes alone, 605 s and 660 s with PiG (0.5.3) and 798 s and 539 s with OpenCode; the whole run 747 s and
+  926 s, 753 s and 951 s, 972 s and 879 s. The Review card took 261–468 s with the same rules in every run, so
+  the totals do not tell the three apart; the ticket cards do. The diffs were alike (4–5 files, 88–126 lines).
+  Since v0.5.0 the card's own model writes the code, tests first, and looks at its screenshot through
+  `opencode run --standalone`; PiG and the `--worker` flag that chose between them are gone (v0.4.0–v0.4.2).
+  Compare any other change the same way: the same tickets, one run at a time (two cores) and more than once.
 - A foreground terminal command has five minutes. `terminal.lifetime_seconds` is 300 and
   `_cleanup_inactive_envs` recycles any sandbox that has no background process of its own, so a command
   still running at 300 s gets its container stopped and returns `exit 137`

@@ -32,9 +32,6 @@ type Options struct {
 	// Home is HOME for the commands that talk to GitHub. The hermes user's default
 	// HOME carries no gh login; the publisher profile's does.
 	Home string
-	// Worker is what a coder card hands its ticket to: one of Workers, empty for the
-	// default. Only plan reads it; the cards are already written when the hooks run.
-	Worker string
 }
 
 // DefaultHome is the publisher profile's home in Basecamp's container, whose gh login is

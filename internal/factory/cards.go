@@ -3,7 +3,6 @@ package factory
 import (
 	"embed"
 	"fmt"
-	"slices"
 	"strings"
 	"text/template"
 )
@@ -22,31 +21,6 @@ const (
 
 	runtimeCoder = 2700
 )
-
-// The workers a coder card can hand its ticket to. The rules of each are one embedded file,
-// coder-rules-<worker>.txt, so a run can be planned with another worker and the same tickets.
-const (
-	WorkerPig      = "pig"
-	WorkerHermes   = "hermes"
-	WorkerOpenCode = "opencode"
-)
-
-// Workers lists them, the default first.
-var Workers = []string{WorkerPig, WorkerHermes, WorkerOpenCode}
-
-// ValidWorker says whether name is one of Workers; the empty name is the default.
-func ValidWorker(name string) bool {
-	return name == "" || slices.Contains(Workers, name)
-}
-
-// coderRules is the file of the worker this run is planned with.
-func (f *Factory) coderRules() string {
-	worker := f.Opts.Worker
-	if worker == "" {
-		worker = Workers[0]
-	}
-	return "coder-rules-" + worker + ".txt"
-}
 
 // rulesData is what the embedded rules interpolate.
 type rulesData struct {
@@ -101,7 +75,7 @@ func (f *Factory) coderBody(run PlannedRun, ticket Ticket, branch string) string
 		lines = append(lines, "Merge first: "+strings.Join(branches, ", "))
 	}
 	parts = append(parts, section("Your run", strings.Join(lines, "\n")))
-	parts = append(parts, rules(f.coderRules(), rulesData{
+	parts = append(parts, rules("coder-rules.txt", rulesData{
 		Repo:   f.Opts.Repo,
 		Issue:  issue,
 		Ticket: ticket.Issue.Number,

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strings"
 )
 
 // Plan reads the issue, its tickets and the board, checks the guards, and returns
@@ -16,9 +15,6 @@ import (
 // has nothing left to do, and a card that is running or ready is a run in flight, which
 // planning again would cut in half.
 func (f *Factory) Plan(ctx context.Context, issue int) (*Plan, error) {
-	if !ValidWorker(f.Opts.Worker) {
-		return nil, fmt.Errorf("unknown worker %q; the workers are %s", f.Opts.Worker, strings.Join(Workers, ", "))
-	}
 	run, err := f.readRun(ctx, issue)
 	if err != nil {
 		return nil, err
